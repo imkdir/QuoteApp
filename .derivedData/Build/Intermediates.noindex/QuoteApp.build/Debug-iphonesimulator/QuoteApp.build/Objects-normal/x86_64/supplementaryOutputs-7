@@ -1,0 +1,30 @@
+{
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/App/RootView.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RootView.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RootView.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RootView.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RootView.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RootView.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Components/Actions/RecordingWaveformField.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RecordingWaveformField.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RecordingWaveformField.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RecordingWaveformField.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RecordingWaveformField.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RecordingWaveformField.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Components/Actions/ReviewStatusButton.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ReviewStatusButton.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ReviewStatusButton.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ReviewStatusButton.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ReviewStatusButton.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ReviewStatusButton.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Domain/Models/RecordingState.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RecordingState.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RecordingState.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RecordingState.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RecordingState.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/RecordingState.swiftdeps"
+  }
+}

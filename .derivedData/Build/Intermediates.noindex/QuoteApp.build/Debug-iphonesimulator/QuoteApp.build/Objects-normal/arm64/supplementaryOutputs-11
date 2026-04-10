@@ -1,0 +1,30 @@
+{
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Domain/Models/MarkedToken.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MarkedToken.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MarkedToken.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MarkedToken.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MarkedToken.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MarkedToken.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Features/Main/MainSessionState.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MainSessionState.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MainSessionState.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MainSessionState.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MainSessionState.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MainSessionState.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Features/Main/MainViewModel.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MainViewModel.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MainViewModel.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MainViewModel.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MainViewModel.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MainViewModel.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/PreviewSupport/MockQuotes.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MockQuotes.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MockQuotes.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MockQuotes.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MockQuotes.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/MockQuotes.swiftdeps"
+  }
+}

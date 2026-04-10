@@ -1,0 +1,30 @@
+{
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/App/QuoteApp.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuoteApp.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuoteApp.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuoteApp.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuoteApp.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuoteApp.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Components/Quote/QuoteListItemView.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuoteListItemView.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuoteListItemView.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuoteListItemView.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuoteListItemView.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuoteListItemView.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Components/Quote/QuotePickerSheet.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuotePickerSheet.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuotePickerSheet.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuotePickerSheet.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuotePickerSheet.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/QuotePickerSheet.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Domain/Models/Quote.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/Quote.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/Quote.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/Quote.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/Quote.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/Quote.swiftdeps"
+  }
+}

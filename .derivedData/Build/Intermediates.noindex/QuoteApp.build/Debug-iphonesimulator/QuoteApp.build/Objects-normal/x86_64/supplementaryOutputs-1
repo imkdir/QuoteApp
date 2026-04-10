@@ -1,0 +1,37 @@
+{
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/App/AppEnvironment.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AppEnvironment.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AppEnvironment.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AppEnvironment.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AppEnvironment.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AppEnvironment.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Components/Actions/ActionStackView.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ActionStackView.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ActionStackView.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ActionStackView.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ActionStackView.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ActionStackView.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Domain/Models/AnalysisState.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AnalysisState.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AnalysisState.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AnalysisState.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AnalysisState.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AnalysisState.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Domain/Services/AnalysisPollingService.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AnalysisPollingService.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AnalysisPollingService.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AnalysisPollingService.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AnalysisPollingService.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/AnalysisPollingService.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Features/Main/ActionToolbarState.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ActionToolbarState.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ActionToolbarState.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ActionToolbarState.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ActionToolbarState.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/x86_64/ActionToolbarState.swiftdeps"
+  }
+}

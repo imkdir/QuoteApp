@@ -1,0 +1,30 @@
+{
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Audio/PlaybackTimingCoordinator.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackTimingCoordinator.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackTimingCoordinator.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackTimingCoordinator.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackTimingCoordinator.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackTimingCoordinator.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Components/Actions/PlaybackActionButton.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackActionButton.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackActionButton.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackActionButton.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackActionButton.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackActionButton.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Domain/Models/PlaybackState.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackState.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackState.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackState.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackState.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PlaybackState.swiftdeps"
+  },
+  "/Users/imkdir/Projects/QuoteApp/apps/ios/QuoteApp/Domain/Models/PracticeAnalysis.swift" : {
+    "const-values" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PracticeAnalysis.swiftconstvalues",
+    "dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PracticeAnalysis.d",
+    "diagnostics" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PracticeAnalysis.dia",
+    "object" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PracticeAnalysis.o",
+    "swift-dependencies" : "/Users/imkdir/Projects/QuoteApp/.derivedData/Build/Intermediates.noindex/QuoteApp.build/Debug-iphonesimulator/QuoteApp.build/Objects-normal/arm64/PracticeAnalysis.swiftdeps"
+  }
+}

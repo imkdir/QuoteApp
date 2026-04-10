@@ -1,0 +1,30 @@
+name: QuoteApp
+options:
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: 5.0
+targets:
+  QuoteApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: App
+      - path: Features
+      - path: Components
+      - path: Domain
+      - path: Audio
+      - path: LiveKit
+      - path: Theme
+      - path: PreviewSupport
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.quoteapp.app
+        PRODUCT_NAME: QuoteApp
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
