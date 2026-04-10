@@ -62,6 +62,10 @@ struct MainScreen: View {
                 .buttonStyle(.bordered)
             }
 
+            Text(viewModel.liveKitStatusText)
+                .font(.footnote)
+                .foregroundStyle(viewModel.isLiveKitStatusError ? .orange : .secondary)
+
             QuoteTextView(tokens: viewModel.currentQuoteTokens)
 
             Spacer(minLength: 20)

@@ -23,22 +23,31 @@ final class MainViewModel: ObservableObject {
     @Published var quotes: [Quote]
     @Published var isLoadingQuotes: Bool
     @Published var quoteLoadingErrorMessage: String?
+    @Published var liveKitConnectionState: LiveKitConnectionState
 
     private let quoteRepository: (any QuoteRepository)?
     private let practiceRepository: (any PracticeRepository)?
     private let analysisPollingService: AnalysisPollingService?
+    private let liveKitSessionManager: LiveKitSessionManager?
+    private let audioSessionManager: AudioSessionManager?
+    private let tutorPlaybackManager: TutorPlaybackManager?
 
     private var sessionStartTask: Task<String, Error>?
     private var resultPollingTask: Task<Void, Never>?
     private var activeLoadingAttemptID: UUID?
     private var nextMockResultCursor: Int
     private let mockResultOrder: [AnalysisState] = [.info, .perfect, .unavailable]
+    private let participantIdentity: String
+    private var cancellables = Set<AnyCancellable>()
 
     init(
         quotes: [Quote] = MockQuotes.all,
         quoteRepository: (any QuoteRepository)? = nil,
         practiceRepository: (any PracticeRepository)? = nil,
         analysisPollingService: AnalysisPollingService? = nil,
+        liveKitSessionManager: LiveKitSessionManager? = nil,
+        audioSessionManager: AudioSessionManager? = nil,
+        tutorPlaybackManager: TutorPlaybackManager? = nil,
         sessionState: MainSessionState = .start,
         isQuotePickerPresented: Bool = false,
         spokenTokenCount: Int = 0,
@@ -46,12 +55,16 @@ final class MainViewModel: ObservableObject {
         tutorPlaybackState: TutorPlaybackState = .pausedOrFinished,
         isLoadingQuotes: Bool = false,
         quoteLoadingErrorMessage: String? = nil,
-        nextMockResultCursor: Int = 0
+        nextMockResultCursor: Int = 0,
+        participantIdentity: String = "ios-\(UUID().uuidString.prefix(8))"
     ) {
         self.quotes = quotes
         self.quoteRepository = quoteRepository
         self.practiceRepository = practiceRepository
         self.analysisPollingService = analysisPollingService
+        self.liveKitSessionManager = liveKitSessionManager
+        self.audioSessionManager = audioSessionManager
+        self.tutorPlaybackManager = tutorPlaybackManager
         self.sessionState = sessionState
         self.isQuotePickerPresented = isQuotePickerPresented
         self.practiceStatusMessage = "Tap Repeat to advance spoken words."
@@ -61,6 +74,10 @@ final class MainViewModel: ObservableObject {
         self.isLoadingQuotes = isLoadingQuotes
         self.quoteLoadingErrorMessage = quoteLoadingErrorMessage
         self.nextMockResultCursor = nextMockResultCursor
+        self.participantIdentity = participantIdentity
+        self.liveKitConnectionState = liveKitSessionManager?.connectionState ?? .disconnected
+
+        bindLiveKitState()
     }
 
     var actionToolbarState: ActionToolbarState {
@@ -139,6 +156,28 @@ final class MainViewModel: ObservableObject {
         return selectedQuote.makeTokens(spokenCount: spokenTokenCount, markedTokenIndexes: markedIndexes)
     }
 
+    var liveKitStatusText: String {
+        switch liveKitConnectionState {
+        case .disconnected:
+            return "LiveKit disconnected"
+        case .requestingToken:
+            return "LiveKit: requesting token..."
+        case let .connecting(room):
+            return "LiveKit: connecting to \(room)"
+        case let .connected(room, identity):
+            return "LiveKit connected (\(identity) in \(room))"
+        case let .failed(message):
+            return "LiveKit error: \(message)"
+        }
+    }
+
+    var isLiveKitStatusError: Bool {
+        if case .failed = liveKitConnectionState {
+            return true
+        }
+        return false
+    }
+
     func openQuotePicker() {
         isQuotePickerPresented = true
         loadQuotesIfNeeded()
@@ -176,7 +215,8 @@ final class MainViewModel: ObservableObject {
             }
 
             do {
-                _ = try await self.ensurePracticeSessionID(for: quote)
+                let sessionID = try await self.ensurePracticeSessionID(for: quote)
+                await self.connectLiveKitIfNeeded(for: quote, sessionID: sessionID)
             } catch is CancellationError {
                 return
             } catch {
@@ -248,8 +288,18 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        tutorPlaybackState = .speaking
-        advanceSpokenProgress()
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            if let quote = self.sessionState.selectedQuote {
+                await self.connectLiveKitForSelectedQuoteIfNeeded(quote)
+            }
+
+            self.tutorPlaybackState = .speaking
+            self.advanceSpokenProgress()
+        }
     }
 
     func recordTapped() {
@@ -481,6 +531,66 @@ final class MainViewModel: ObservableObject {
         }
     }
 
+    private func bindLiveKitState() {
+        guard let liveKitSessionManager else {
+            return
+        }
+
+        liveKitSessionManager.$connectionState
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                guard let self else {
+                    return
+                }
+                self.liveKitConnectionState = state
+                self.tutorPlaybackManager?.applyLiveKitConnectionState(state)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func connectLiveKitForSelectedQuoteIfNeeded(_ quote: Quote) async {
+        do {
+            let sessionID = try await ensurePracticeSessionID(for: quote)
+            await connectLiveKitIfNeeded(for: quote, sessionID: sessionID)
+        } catch {
+            // Keep playback mock flow unblocked while surfacing the connection issue.
+            practiceStatusMessage = "LiveKit connection failed. Playback remains mocked."
+        }
+    }
+
+    private func connectLiveKitIfNeeded(
+        for quote: Quote,
+        sessionID: String
+    ) async {
+        guard let liveKitSessionManager else {
+            return
+        }
+
+        if case .connected = liveKitConnectionState {
+            return
+        }
+
+        do {
+            try audioSessionManager?.configureForVoiceInteraction()
+        } catch {
+            practiceStatusMessage = "Audio setup failed. LiveKit connection may fail."
+        }
+
+        let roomName = makeLiveKitRoomName(quoteID: quote.id, sessionID: sessionID)
+        await liveKitSessionManager.connect(
+            identity: participantIdentity,
+            roomName: roomName,
+            displayName: "QuoteApp Learner"
+        )
+    }
+
+    private func makeLiveKitRoomName(quoteID: String, sessionID: String) -> String {
+        let raw = "practice-\(quoteID)-\(sessionID)"
+        let allowed = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
+        let sanitized = String(raw.filter { allowed.contains($0) })
+        return sanitized.isEmpty ? "practice-default" : sanitized
+    }
+
     private func applyBackendResult(
         _ latestResult: PracticeLatestResult,
         toLocalAttemptID attemptID: UUID
@@ -625,12 +735,21 @@ final class MainViewModel: ObservableObject {
 }
 
 extension MainViewModel {
-    static func runtime(environment: AppEnvironment = .runtime) -> MainViewModel {
+    @MainActor
+    static func runtime() -> MainViewModel {
+        MainViewModel.runtime(environment: .runtime)
+    }
+
+    @MainActor
+    static func runtime(environment: AppEnvironment) -> MainViewModel {
         MainViewModel(
             quotes: [],
             quoteRepository: environment.quoteRepository,
             practiceRepository: environment.practiceRepository,
             analysisPollingService: environment.analysisPollingService,
+            liveKitSessionManager: environment.liveKitSessionManager,
+            audioSessionManager: environment.audioSessionManager,
+            tutorPlaybackManager: environment.tutorPlaybackManager,
             quoteLoadingErrorMessage: nil
         )
     }

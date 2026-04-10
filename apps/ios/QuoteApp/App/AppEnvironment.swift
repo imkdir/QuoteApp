@@ -5,7 +5,11 @@ struct AppEnvironment {
     let quoteRepository: any QuoteRepository
     let practiceRepository: any PracticeRepository
     let analysisPollingService: AnalysisPollingService
+    let liveKitSessionManager: LiveKitSessionManager
+    let audioSessionManager: AudioSessionManager
+    let tutorPlaybackManager: TutorPlaybackManager
 
+    @MainActor
     static var runtime: AppEnvironment {
         let configuredURL =
             Bundle.main.object(forInfoDictionaryKey: "QUOTEAPP_BACKEND_BASE_URL") as? String ??
@@ -14,6 +18,7 @@ struct AppEnvironment {
 
         let fallbackURL = URL(string: "http://127.0.0.1:8000")!
         let backendBaseURL = URL(string: configuredURL) ?? fallbackURL
+        let tokenProvider = LiveKitTokenProvider(baseURL: backendBaseURL)
 
         return AppEnvironment(
             backendBaseURL: backendBaseURL,
@@ -23,7 +28,10 @@ struct AppEnvironment {
             practiceRepository: PracticeRepositoryImpl(
                 practiceService: PracticeService(baseURL: backendBaseURL)
             ),
-            analysisPollingService: AnalysisPollingService()
+            analysisPollingService: AnalysisPollingService(),
+            liveKitSessionManager: LiveKitSessionManager(tokenProvider: tokenProvider),
+            audioSessionManager: AudioSessionManager(),
+            tutorPlaybackManager: TutorPlaybackManager()
         )
     }
 }
