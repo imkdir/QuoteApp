@@ -5,6 +5,49 @@
 	<key>logFormatVersion</key>
 	<integer>12</integer>
 	<key>logs</key>
-	<dict/>
+	<dict>
+		<key>F9E0DB6B-0B19-4C78-A28C-F2F001179949</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>F9E0DB6B-0B19-4C78-A28C-F2F001179949.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>S</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>0</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>QuoteApp project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>QuoteApp</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Building project QuoteApp with scheme QuoteApp and configuration Debug</string>
+			<key>timeStartedRecording</key>
+			<real>797514637.64563298</real>
+			<key>timeStoppedRecording</key>
+			<real>797514642.42977405</real>
+			<key>title</key>
+			<string>Building project QuoteApp with scheme QuoteApp and configuration Debug</string>
+			<key>uniqueIdentifier</key>
+			<string>F9E0DB6B-0B19-4C78-A28C-F2F001179949</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

@@ -53,7 +53,7 @@ struct MainScreen: View {
                 .buttonStyle(.bordered)
             }
 
-            QuoteTextView(quote: quote)
+            QuoteTextView(tokens: viewModel.currentQuoteTokens)
 
             Spacer(minLength: 20)
 
@@ -78,8 +78,14 @@ struct MainScreen_Previews: PreviewProvider {
             MainScreen(viewModel: .previewStart)
                 .previewDisplayName("Start State")
 
-            MainScreen(viewModel: .previewPractice)
-                .previewDisplayName("Practice State")
+            MainScreen(viewModel: .previewPracticeAllDimmed)
+                .previewDisplayName("Practice All Dimmed")
+
+            MainScreen(viewModel: .previewPracticePartiallySpoken)
+                .previewDisplayName("Practice Partially Spoken")
+
+            MainScreen(viewModel: .previewPracticeMarked)
+                .previewDisplayName("Practice Marked Words")
         }
     }
 }

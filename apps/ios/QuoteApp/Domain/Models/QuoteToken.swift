@@ -1,1 +1,11 @@
-// Purpose: Placeholder for QuoteToken.swift in QuoteApp MVP architecture.
+import Foundation
+
+struct QuoteToken: Identifiable, Hashable {
+    let index: Int
+    let rawText: String
+    let normalizedText: String
+    let isSpoken: Bool
+    let isMarked: Bool
+
+    var id: Int { index }
+}

@@ -1,1 +1,8 @@
-// Purpose: Placeholder for MarkedToken.swift in QuoteApp MVP architecture.
+import Foundation
+
+struct MarkedToken: Identifiable, Hashable {
+    let index: Int
+    let normalizedText: String
+
+    var id: String { "\(index)-\(normalizedText)" }
+}
