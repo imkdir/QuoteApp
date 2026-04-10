@@ -422,11 +422,11 @@ final class MainViewModel: ObservableObject {
             return
         }
 
+        let draftRecordingReference = localDraft.recordingReference
         let attemptID = UUID()
-        userRecordingManager?.clearRecording()
         let newAttempt = PracticeAttempt(
             id: attemptID,
-            recordingReference: localDraft.recordingReference,
+            recordingReference: draftRecordingReference,
             analysis: PracticeAnalysis(
                 state: .loading,
                 feedbackText: "Reviewing your latest attempt."
@@ -448,10 +448,12 @@ final class MainViewModel: ObservableObject {
         guard let selectedQuote = sessionState.selectedQuote,
               let practiceRepository,
               let analysisPollingService else {
+            userRecordingManager?.clearRecording()
             resolveMockAnalysis(for: attemptID)
             return
         }
 
+        let draftFileURL = URL(fileURLWithPath: draftRecordingReference)
         resultPollingTask = Task { [weak self] in
             guard let self else {
                 return
@@ -459,6 +461,34 @@ final class MainViewModel: ObservableObject {
 
             do {
                 let sessionID = try await self.ensurePracticeSessionID(for: selectedQuote)
+                let submission = try await practiceRepository.submitAttempt(
+                    sessionID: sessionID,
+                    recordingFileURL: draftFileURL,
+                    originalRecordingReference: draftRecordingReference
+                )
+                self.updateAttemptSubmissionMetadata(
+                    forAttemptID: attemptID,
+                    backendAttemptID: submission.attemptID,
+                    recordingReference: submission.recordingReference
+                )
+
+                if submission.state != .loading {
+                    let immediateAnalysis = PracticeAnalysis(
+                        state: submission.state,
+                        feedbackText: "Review completed."
+                    )
+                    self.updateAnalysis(
+                        immediateAnalysis,
+                        forAttemptID: attemptID,
+                        backendAttemptID: submission.attemptID
+                    )
+                    self.activeLoadingAttemptID = nil
+                    self.practiceStatusMessage = self.statusMessage(for: submission.state)
+                    self.userRecordingManager?.clearRecording()
+                    return
+                }
+
+                self.userRecordingManager?.clearRecording()
                 let latestResult = try await analysisPollingService.pollLatestResult(
                     sessionID: sessionID,
                     repository: practiceRepository
@@ -471,11 +501,26 @@ final class MainViewModel: ObservableObject {
                     toLocalAttemptID: attemptID,
                     message: "Review timed out for this attempt."
                 )
+                self.userRecordingManager?.clearRecording()
             } catch {
+                let message: String
+                if let serviceError = error as? PracticeService.PracticeServiceError {
+                    switch serviceError {
+                    case .failedToReadRecordingFile:
+                        message = "Review unavailable. The local recording file could not be read."
+                    case .emptyRecordingFile:
+                        message = "Review unavailable. The recording file was empty."
+                    case .invalidHTTPResponse, .badStatusCode, .decodingFailed:
+                        message = "Review unavailable. Could not submit recording for review."
+                    }
+                } else {
+                    message = "Review unavailable. Could not submit recording for review."
+                }
                 self.applyUnavailableResult(
                     toLocalAttemptID: attemptID,
-                    message: "Review unavailable. Could not fetch latest attempt result."
+                    message: message
                 )
+                self.userRecordingManager?.clearRecording()
             }
         }
     }
@@ -679,6 +724,7 @@ final class MainViewModel: ObservableObject {
             }
 
             session.attempts[index].backendAttemptID = latestResult.attemptID
+            session.attempts[index].recordingReference = latestResult.recordingReference
             session.attempts[index].analysis = latestResult.analysis
         }
 
@@ -719,6 +765,21 @@ final class MainViewModel: ObservableObject {
             if let backendAttemptID {
                 session.attempts[index].backendAttemptID = backendAttemptID
             }
+        }
+    }
+
+    private func updateAttemptSubmissionMetadata(
+        forAttemptID attemptID: UUID,
+        backendAttemptID: String,
+        recordingReference: String
+    ) {
+        updatePracticeSession { session in
+            guard let index = session.attempts.firstIndex(where: { $0.id == attemptID }) else {
+                return
+            }
+
+            session.attempts[index].backendAttemptID = backendAttemptID
+            session.attempts[index].recordingReference = recordingReference
         }
     }
 

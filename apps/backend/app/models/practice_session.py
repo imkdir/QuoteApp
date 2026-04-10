@@ -43,3 +43,13 @@ class StartPracticeSessionResponse(BaseModel):
     quote_id: str
     latest_attempt_id: Optional[str] = None
     latest_result_state: Optional[AnalysisState] = None
+
+
+class SubmitPracticeAttemptResponse(BaseModel):
+    """Submission response returned when learner audio becomes a new attempt."""
+
+    session_id: str
+    quote_id: str
+    attempt_id: str
+    recording_reference: str
+    state: AnalysisState

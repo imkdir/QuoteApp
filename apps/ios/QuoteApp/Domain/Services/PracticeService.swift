@@ -15,11 +15,21 @@ struct PracticeLatestResult {
     let analysis: PracticeAnalysis
 }
 
+struct PracticeAttemptSubmission {
+    let sessionID: String
+    let quoteID: String
+    let attemptID: String
+    let recordingReference: String
+    let state: AnalysisState
+}
+
 struct PracticeService {
     enum PracticeServiceError: LocalizedError {
         case invalidHTTPResponse
         case badStatusCode(Int)
         case decodingFailed
+        case failedToReadRecordingFile
+        case emptyRecordingFile
 
         var errorDescription: String? {
             switch self {
@@ -29,6 +39,10 @@ struct PracticeService {
                 return "Backend returned status code \(code)."
             case .decodingFailed:
                 return "Could not decode practice data from backend response."
+            case .failedToReadRecordingFile:
+                return "Could not read the local recording file for submission."
+            case .emptyRecordingFile:
+                return "Cannot submit an empty recording."
             }
         }
     }
@@ -84,6 +98,22 @@ struct PracticeService {
             case stateRaw = "state"
             case markedTokens = "marked_tokens"
             case feedbackText = "feedback_text"
+        }
+    }
+
+    private struct SubmitAttemptResponseDTO: Decodable {
+        let sessionID: String
+        let quoteID: String
+        let attemptID: String
+        let recordingReference: String
+        let stateRaw: String
+
+        enum CodingKeys: String, CodingKey {
+            case sessionID = "session_id"
+            case quoteID = "quote_id"
+            case attemptID = "attempt_id"
+            case recordingReference = "recording_reference"
+            case stateRaw = "state"
         }
     }
 
@@ -162,6 +192,53 @@ struct PracticeService {
             )
         } catch let error as PracticeServiceError {
             throw error
+        } catch {
+            throw PracticeServiceError.decodingFailed
+        }
+    }
+
+    func submitAttempt(
+        sessionID: String,
+        recordingFileURL: URL,
+        originalRecordingReference: String
+    ) async throws -> PracticeAttemptSubmission {
+        let recordingData: Data
+        do {
+            recordingData = try Data(contentsOf: recordingFileURL)
+        } catch {
+            throw PracticeServiceError.failedToReadRecordingFile
+        }
+
+        guard !recordingData.isEmpty else {
+            throw PracticeServiceError.emptyRecordingFile
+        }
+
+        let endpoint = baseURL
+            .appendingPathComponent("practice")
+            .appendingPathComponent("session")
+            .appendingPathComponent(sessionID)
+            .appendingPathComponent("attempt")
+            .appendingPathComponent("submit")
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(recordingFileURL.lastPathComponent, forHTTPHeaderField: "X-QuoteApp-Filename")
+        request.setValue(originalRecordingReference, forHTTPHeaderField: "X-QuoteApp-Recording-Reference")
+        request.httpBody = recordingData
+
+        let data = try await perform(request: request)
+
+        do {
+            let dto = try JSONDecoder().decode(SubmitAttemptResponseDTO.self, from: data)
+            return PracticeAttemptSubmission(
+                sessionID: dto.sessionID,
+                quoteID: dto.quoteID,
+                attemptID: dto.attemptID,
+                recordingReference: dto.recordingReference,
+                state: AnalysisState(backendValue: dto.stateRaw)
+            )
         } catch {
             throw PracticeServiceError.decodingFailed
         }

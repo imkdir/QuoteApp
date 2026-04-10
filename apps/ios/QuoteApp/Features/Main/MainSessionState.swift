@@ -3,7 +3,7 @@ import Foundation
 struct PracticeAttempt: Identifiable, Equatable {
     let id: UUID
     var backendAttemptID: String?
-    let recordingReference: String
+    var recordingReference: String
     var analysis: PracticeAnalysis?
     var isSupersededForUI: Bool
 

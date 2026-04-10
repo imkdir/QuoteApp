@@ -29,6 +29,12 @@ _MOCK_STATE_ORDER: list[AnalysisState] = [
     AnalysisState.perfect,
     AnalysisState.unavailable,
 ]
+_SUBMITTED_ATTEMPT_STATE_ORDER: list[AnalysisState] = [
+    AnalysisState.info,
+    AnalysisState.perfect,
+    AnalysisState.unavailable,
+]
+_LOADING_RESOLVE_SECONDS = 2
 _LOADING_TIMEOUT_SECONDS = 12
 
 
@@ -97,6 +103,20 @@ def build_latest_result_response(
         review_result = _make_timeout_unavailable_result()
         latest_attempt.review_result = review_result
 
+    if _is_ready_for_mock_completion(
+        created_at=latest_attempt.created_at,
+        review_result=review_result,
+    ):
+        completed_state = choose_mock_state_for_attempt(
+            quote_id=session.quote_id,
+            attempt_id=latest_attempt.attempt_id,
+        )
+        review_result = build_mock_review_result(
+            state=completed_state,
+            quote_text=session.quote_text,
+        )
+        latest_attempt.review_result = review_result
+
     if override_state is not None:
         review_result = build_mock_review_result(
             state=override_state,
@@ -122,6 +142,25 @@ def _is_loading_timed_out(*, created_at: datetime, review_result: TutorReviewRes
 
     deadline = created_at + timedelta(seconds=_LOADING_TIMEOUT_SECONDS)
     return datetime.now(timezone.utc) >= deadline
+
+
+def _is_ready_for_mock_completion(*, created_at: datetime, review_result: TutorReviewResult) -> bool:
+    """Returns true when a submitted loading attempt should resolve to a mock terminal state."""
+
+    if review_result.state != AnalysisState.loading:
+        return False
+
+    ready_at = created_at + timedelta(seconds=_LOADING_RESOLVE_SECONDS)
+    return datetime.now(timezone.utc) >= ready_at
+
+
+def choose_mock_state_for_attempt(*, quote_id: str, attempt_id: str) -> AnalysisState:
+    """Deterministically maps a submitted attempt into a terminal mock state."""
+
+    state_index = sum(ord(char) for char in f"{quote_id}:{attempt_id}") % len(
+        _SUBMITTED_ATTEMPT_STATE_ORDER
+    )
+    return _SUBMITTED_ATTEMPT_STATE_ORDER[state_index]
 
 
 def _make_timeout_unavailable_result() -> TutorReviewResult:
