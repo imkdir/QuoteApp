@@ -9,6 +9,7 @@ xcuserdata/
 
 # Xcode build artifacts
 DerivedData/
+.derivedData/
 .build/
 *.ipa
 *.dSYM.zip
