@@ -510,8 +510,18 @@ final class MainViewModel: ObservableObject {
                         message = "Review unavailable. The local recording file could not be read."
                     case .emptyRecordingFile:
                         message = "Review unavailable. The recording file was empty."
-                    case .invalidHTTPResponse, .badStatusCode, .decodingFailed:
-                        message = "Review unavailable. Could not submit recording for review."
+                    case let .badStatusCode(code, detail):
+                        if let detail, !detail.isEmpty {
+                            message = "Review unavailable. Submission failed (\(code)): \(detail)"
+                        } else {
+                            message = "Review unavailable. Submission failed with status \(code)."
+                        }
+                    case let .requestFailed(detail):
+                        message = "Review unavailable. Could not reach backend: \(detail)"
+                    case .invalidHTTPResponse:
+                        message = "Review unavailable. Backend returned an invalid response."
+                    case .decodingFailed:
+                        message = "Review unavailable. Backend response could not be decoded."
                     }
                 } else {
                     message = "Review unavailable. Could not submit recording for review."

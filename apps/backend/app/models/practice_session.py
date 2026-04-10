@@ -24,6 +24,10 @@ class PracticeSession(BaseModel):
     session_id: str
     quote_id: str
     quote_text: Optional[str] = None
+    livekit_room: str
+    tutor_identity: str
+    tutor_status: str = "pending"
+    tutor_status_message: Optional[str] = None
     attempts: list[PracticeAttempt] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -41,6 +45,9 @@ class StartPracticeSessionResponse(BaseModel):
 
     session_id: str
     quote_id: str
+    livekit_room: Optional[str] = None
+    tutor_identity: Optional[str] = None
+    tutor_status: Optional[str] = None
     latest_attempt_id: Optional[str] = None
     latest_result_state: Optional[AnalysisState] = None
 

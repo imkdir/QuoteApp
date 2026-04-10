@@ -26,16 +26,20 @@ struct PracticeAttemptSubmission {
 struct PracticeService {
     enum PracticeServiceError: LocalizedError {
         case invalidHTTPResponse
-        case badStatusCode(Int)
+        case badStatusCode(Int, String?)
         case decodingFailed
         case failedToReadRecordingFile
         case emptyRecordingFile
+        case requestFailed(String)
 
         var errorDescription: String? {
             switch self {
             case .invalidHTTPResponse:
                 return "Invalid response from backend."
-            case let .badStatusCode(code):
+            case let .badStatusCode(code, detail):
+                if let detail, !detail.isEmpty {
+                    return "Backend returned status code \(code): \(detail)"
+                }
                 return "Backend returned status code \(code)."
             case .decodingFailed:
                 return "Could not decode practice data from backend response."
@@ -43,6 +47,8 @@ struct PracticeService {
                 return "Could not read the local recording file for submission."
             case .emptyRecordingFile:
                 return "Cannot submit an empty recording."
+            case let .requestFailed(message):
+                return "Request failed: \(message)"
             }
         }
     }
@@ -245,16 +251,54 @@ struct PracticeService {
     }
 
     private func perform(request: URLRequest) async throws -> Data {
-        let (data, response) = try await session.data(for: request)
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            let nsError = error as NSError
+            throw PracticeServiceError.requestFailed(
+                nsError.localizedFailureReason ?? nsError.localizedDescription
+            )
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw PracticeServiceError.invalidHTTPResponse
         }
 
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw PracticeServiceError.badStatusCode(httpResponse.statusCode)
+            throw PracticeServiceError.badStatusCode(
+                httpResponse.statusCode,
+                extractBackendDetail(from: data)
+            )
         }
 
         return data
+    }
+
+    private func extractBackendDetail(from data: Data) -> String? {
+        guard !data.isEmpty else {
+            return nil
+        }
+
+        if let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let detail = payload["detail"] {
+            if let detailString = detail as? String, !detailString.isEmpty {
+                return detailString
+            }
+
+            if let detailObject = detail as? [String: Any],
+               let message = detailObject["message"] as? String,
+               !message.isEmpty {
+                return message
+            }
+        }
+
+        if let body = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !body.isEmpty {
+            return body
+        }
+
+        return nil
     }
 }
