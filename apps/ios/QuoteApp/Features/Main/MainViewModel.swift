@@ -353,7 +353,11 @@ final class MainViewModel: ObservableObject {
             } catch UserRecordingManager.RecordingError.microphonePermissionDenied {
                 self.practiceStatusMessage = "Microphone permission denied. Enable it in Settings to record."
             } catch {
-                self.practiceStatusMessage = "Could not start recording."
+                if let detail = userRecordingManager.lastErrorMessage, !detail.isEmpty {
+                    self.practiceStatusMessage = detail
+                } else {
+                    self.practiceStatusMessage = "Could not start recording."
+                }
             }
         }
     }

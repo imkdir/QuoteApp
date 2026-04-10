@@ -6,18 +6,18 @@ import Foundation
 final class UserRecordingManager: NSObject, ObservableObject {
     enum RecordingError: LocalizedError {
         case microphonePermissionDenied
-        case failedToPrepareRecorder
-        case failedToStartRecorder
+        case failedToPrepareRecorder(reason: String? = nil)
+        case failedToStartRecorder(reason: String? = nil)
         case noActiveRecording
 
         var errorDescription: String? {
             switch self {
             case .microphonePermissionDenied:
                 return "Microphone permission is required to record."
-            case .failedToPrepareRecorder:
-                return "Could not prepare recorder."
-            case .failedToStartRecorder:
-                return "Could not start recording."
+            case let .failedToPrepareRecorder(reason):
+                return reason.map { "Could not prepare recorder: \($0)" } ?? "Could not prepare recorder."
+            case let .failedToStartRecorder(reason):
+                return reason.map { "Could not start recording: \($0)" } ?? "Could not start recording."
             case .noActiveRecording:
                 return "No active recording to stop."
             }
@@ -30,8 +30,18 @@ final class UserRecordingManager: NSObject, ObservableObject {
 
     private var audioRecorder: AVAudioRecorder?
     private var meterTimer: Timer?
+    private var smoothedMeterLevel: CGFloat = 0
     private static let meterBarCount = 16
-    private static let defaultMeterLevels = Array(repeating: CGFloat(0.12), count: meterBarCount)
+    private static let meterSampleInterval: TimeInterval = 1.0 / 30.0
+    private static let defaultMeterLevels = Array(repeating: CGFloat(0.08), count: meterBarCount)
+    private static let minimumDisplayLevel: CGFloat = 0.03
+    private static let averageFloorDecibels: Float = -52
+    private static let peakFloorDecibels: Float = -38
+    private static let normalizationGamma: CGFloat = 0.65
+    private static let attackSmoothing: CGFloat = 0.5
+    private static let releaseSmoothing: CGFloat = 0.22
+    private static let noiseGateThreshold: CGFloat = 0.055
+    private static let noiseGateAttenuation: CGFloat = 0.4
 
     override init() {
         self.meterLevels = UserRecordingManager.defaultMeterLevels
@@ -67,32 +77,36 @@ final class UserRecordingManager: NSObject, ObservableObject {
         }
 
         let fileURL = makeDraftURL()
-        let settings: [String: Any] = [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 44_100,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ]
+        let settings = makeRecorderSettings()
 
         do {
             let recorder = try AVAudioRecorder(url: fileURL, settings: settings)
             recorder.delegate = self
             recorder.isMeteringEnabled = true
-            recorder.prepareToRecord()
+            guard recorder.prepareToRecord() else {
+                throw RecordingError.failedToPrepareRecorder()
+            }
 
             guard recorder.record() else {
-                throw RecordingError.failedToStartRecorder
+                throw RecordingError.failedToStartRecorder()
             }
 
             audioRecorder = recorder
             recordingState = .recording(fileURL: fileURL)
             meterLevels = Self.defaultMeterLevels
+            smoothedMeterLevel = 0
             lastErrorMessage = nil
             startMetering()
             return fileURL
+        } catch let error as RecordingError {
+            lastErrorMessage = error.localizedDescription
+            throw error
         } catch {
-            lastErrorMessage = RecordingError.failedToPrepareRecorder.localizedDescription
-            throw RecordingError.failedToPrepareRecorder
+            let nsError = error as NSError
+            let reason = nsError.localizedFailureReason ?? nsError.localizedDescription
+            let wrappedError = RecordingError.failedToPrepareRecorder(reason: reason)
+            lastErrorMessage = wrappedError.localizedDescription
+            throw wrappedError
         }
     }
 
@@ -127,17 +141,17 @@ final class UserRecordingManager: NSObject, ObservableObject {
         audioRecorder = nil
         recordingState = .idle
         meterLevels = Self.defaultMeterLevels
+        smoothedMeterLevel = 0
         lastErrorMessage = nil
     }
 
     private func startMetering() {
         stopMetering()
 
-        meterTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.captureMeterLevel()
-            }
+        meterTimer = Timer.scheduledTimer(withTimeInterval: Self.meterSampleInterval, repeats: true) { [weak self] _ in
+            self?.captureMeterLevel()
         }
+        meterTimer?.tolerance = 0.01
     }
 
     private func stopMetering() {
@@ -152,18 +166,54 @@ final class UserRecordingManager: NSObject, ObservableObject {
 
         recorder.updateMeters()
         let averagePower = recorder.averagePower(forChannel: 0)
-        let normalized = max(CGFloat(0.04), min(CGFloat(1.0), CGFloat(pow(10.0, averagePower / 20.0))))
-        meterLevels.append(normalized)
+        let peakPower = recorder.peakPower(forChannel: 0)
+        let normalizedAverage = Self.normalizedPower(from: averagePower, floor: Self.averageFloorDecibels)
+        let normalizedPeak = Self.normalizedPower(from: peakPower, floor: Self.peakFloorDecibels)
+
+        var blended = (normalizedAverage * 0.72) + (normalizedPeak * 0.28)
+        if blended < Self.noiseGateThreshold {
+            blended *= Self.noiseGateAttenuation
+        }
+
+        let smoothing = blended > smoothedMeterLevel
+            ? Self.attackSmoothing
+            : Self.releaseSmoothing
+        smoothedMeterLevel += (blended - smoothedMeterLevel) * smoothing
+
+        let displayLevel = max(Self.minimumDisplayLevel, min(CGFloat(1.0), smoothedMeterLevel))
+        meterLevels.append(displayLevel)
 
         if meterLevels.count > Self.meterBarCount {
             meterLevels.removeFirst(meterLevels.count - Self.meterBarCount)
         }
     }
 
+    private static func normalizedPower(from decibels: Float, floor: Float) -> CGFloat {
+        guard decibels.isFinite else {
+            return 0
+        }
+
+        let clampedDecibels = min(Float(0), max(floor, decibels))
+        let linear = (clampedDecibels - floor) / abs(floor)
+        return pow(CGFloat(linear), normalizationGamma)
+    }
+
     private func makeDraftURL() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("quoteapp-draft-\(UUID().uuidString)")
             .appendingPathExtension("m4a")
+    }
+
+    private func makeRecorderSettings() -> [String: Any] {
+        let session = AVAudioSession.sharedInstance()
+        let preferredSampleRate = session.sampleRate > 0 ? session.sampleRate : 44_100
+
+        return [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: preferredSampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
     }
 }
 

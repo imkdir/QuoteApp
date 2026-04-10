@@ -23,8 +23,8 @@ struct RecordingInputToolbar: View {
             .accessibilityLabel(state.trailingLabel)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .frame(minHeight: 44, maxHeight: 44)
+        .padding(.vertical, 5)
+        .frame(minHeight: 48, maxHeight: 48)
         .background(.ultraThinMaterial, in: Capsule(style: .continuous))
         .overlay(
             Capsule(style: .continuous)
