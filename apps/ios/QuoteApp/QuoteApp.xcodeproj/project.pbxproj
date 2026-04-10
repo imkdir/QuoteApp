@@ -12,6 +12,7 @@
 		09A25A0D5C361E7F90FF6252 /* RecordingInputToolbarState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB68EB47D1CF9AA11E70040A /* RecordingInputToolbarState.swift */; };
 		0A42290222662532AA73EA08 /* QuoteTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E7073FAE8925BF92334FECE /* QuoteTextView.swift */; };
 		166FE4D954F64FB2E95829A7 /* Quote.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4E90D1CC5ED2DB064DB24BF /* Quote.swift */; };
+		2101B394EF59FCBE7EE1376C /* QuoteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73187205C69DF64DC2158CA7 /* QuoteService.swift */; };
 		2162172E62963610C4B7F627 /* PlaybackState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C7D966D1CCC8E31A7EBAA82 /* PlaybackState.swift */; };
 		25789F305F55BB6373418FD5 /* ActionStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957032671320A08B02D81657 /* ActionStackView.swift */; };
 		25B7240490243B89BF63A704 /* PlaybackActionButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A69D0C357C06628A9814142 /* PlaybackActionButton.swift */; };
@@ -27,6 +28,7 @@
 		769A7DB2489766B427B485FE /* QuoteListItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC094CC1B49F4B162C7E0227 /* QuoteListItemView.swift */; };
 		7919275E1CBB9DFA408B22A0 /* UserRecordingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B822AFE52F53F3DBBA85B3C /* UserRecordingManager.swift */; };
 		806072C09A59D9E510DA37A6 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BDE761778A793715FD65AE9 /* RootView.swift */; };
+		8994A7EB2BC30B8505EB6060 /* QuoteRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4DCCC77A4D3A0AC74650A7 /* QuoteRepository.swift */; };
 		8B981B1502F3CD1E5505521B /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA015C3E3B3DABA8D33BBD0 /* AppEnvironment.swift */; };
 		8D17DEA990A3611DCDFB9267 /* QuoteToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF467E05B9B5899B1394069D /* QuoteToken.swift */; };
 		91FD0103B569BED13FE2974C /* QuotePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF73190212EA0175F00507F /* QuotePickerSheet.swift */; };
@@ -58,8 +60,10 @@
 		5BDE761778A793715FD65AE9 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		6247001E96324250B32B9B88 /* MarkedToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkedToken.swift; sourceTree = "<group>"; };
 		6EB11FD416A81520FD7F9622 /* MainScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainScreen.swift; sourceTree = "<group>"; };
+		73187205C69DF64DC2158CA7 /* QuoteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteService.swift; sourceTree = "<group>"; };
 		7C8570F36EDC859482832423 /* RecordingInputToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingInputToolbar.swift; sourceTree = "<group>"; };
 		80DA95C20205AF6E6CABF7E6 /* LiveKitSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitSessionManager.swift; sourceTree = "<group>"; };
+		8B4DCCC77A4D3A0AC74650A7 /* QuoteRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteRepository.swift; sourceTree = "<group>"; };
 		8B822AFE52F53F3DBBA85B3C /* UserRecordingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserRecordingManager.swift; sourceTree = "<group>"; };
 		957032671320A08B02D81657 /* ActionStackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionStackView.swift; sourceTree = "<group>"; };
 		98ADA70B37422F26AFB012A4 /* QuoteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteApp.swift; sourceTree = "<group>"; };
@@ -86,6 +90,7 @@
 			isa = PBXGroup;
 			children = (
 				36012CA5E6DA9DA6949BBA08 /* Models */,
+				2EE2D3AA3500569945150BC2 /* Repositories */,
 				78809BB68009D01C20A767A7 /* Services */,
 			);
 			path = Domain;
@@ -117,6 +122,14 @@
 				E103B99DD704F48BC7579C62 /* ReviewStatusButton.swift */,
 			);
 			path = Actions;
+			sourceTree = "<group>";
+		};
+		2EE2D3AA3500569945150BC2 /* Repositories */ = {
+			isa = PBXGroup;
+			children = (
+				8B4DCCC77A4D3A0AC74650A7 /* QuoteRepository.swift */,
+			);
+			path = Repositories;
 			sourceTree = "<group>";
 		};
 		36012CA5E6DA9DA6949BBA08 /* Models */ = {
@@ -191,6 +204,7 @@
 			isa = PBXGroup;
 			children = (
 				30CD945E4C33759367468191 /* AnalysisPollingService.swift */,
+				73187205C69DF64DC2158CA7 /* QuoteService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -332,6 +346,8 @@
 				5EADAA4A3C892E1A496B07F8 /* QuoteApp.swift in Sources */,
 				769A7DB2489766B427B485FE /* QuoteListItemView.swift in Sources */,
 				91FD0103B569BED13FE2974C /* QuotePickerSheet.swift in Sources */,
+				8994A7EB2BC30B8505EB6060 /* QuoteRepository.swift in Sources */,
+				2101B394EF59FCBE7EE1376C /* QuoteService.swift in Sources */,
 				0A42290222662532AA73EA08 /* QuoteTextView.swift in Sources */,
 				8D17DEA990A3611DCDFB9267 /* QuoteToken.swift in Sources */,
 				08163B6C2F015B157B3FFC0B /* RecordingInputToolbar.swift in Sources */,

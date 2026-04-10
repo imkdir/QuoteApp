@@ -1,9 +1,10 @@
 import SwiftUI
 
+@MainActor
 struct MainScreen: View {
     @StateObject private var viewModel: MainViewModel
 
-    init(viewModel: MainViewModel = MainViewModel()) {
+    init(viewModel: MainViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
 
@@ -20,7 +21,10 @@ struct MainScreen: View {
         .sheet(isPresented: $viewModel.isQuotePickerPresented) {
             QuotePickerSheet(
                 quotes: viewModel.quotes,
+                isLoading: viewModel.isLoadingQuotes && viewModel.quotes.isEmpty,
+                errorMessage: viewModel.quoteLoadingErrorMessage,
                 onSelect: viewModel.selectQuote,
+                onRetry: viewModel.retryQuoteLoading,
                 onClose: viewModel.closeQuotePicker
             )
             .presentationDetents([.medium, .large])

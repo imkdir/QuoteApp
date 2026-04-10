@@ -10,9 +10,11 @@ struct QuoteListItemView: View {
                 .foregroundStyle(.primary)
                 .lineLimit(2)
 
-            Text("\(quote.bookTitle) • \(quote.author)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if !quote.bookTitle.isEmpty || !quote.author.isEmpty {
+                Text("\(quote.bookTitle) • \(quote.author)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)

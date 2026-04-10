@@ -2,7 +2,10 @@ import SwiftUI
 
 struct QuotePickerSheet: View {
     let quotes: [Quote]
+    let isLoading: Bool
+    let errorMessage: String?
     let onSelect: (Quote) -> Void
+    let onRetry: () -> Void
     let onClose: () -> Void
 
     var body: some View {
@@ -26,6 +29,33 @@ struct QuotePickerSheet: View {
                     .frame(width: 32, height: 32)
             }
 
+            content
+        }
+        .padding(20)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if isLoading {
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("Loading quotes...")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let errorMessage, quotes.isEmpty {
+            VStack(spacing: 12) {
+                Text(errorMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Button("Retry", action: onRetry)
+                    .buttonStyle(.borderedProminent)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     ForEach(quotes) { quote in
@@ -37,19 +67,43 @@ struct QuotePickerSheet: View {
                 }
             }
         }
-        .padding(20)
     }
 }
 
 #if DEBUG
 struct QuotePickerSheet_Previews: PreviewProvider {
     static var previews: some View {
-        QuotePickerSheet(
-            quotes: MockQuotes.all,
-            onSelect: { _ in },
-            onClose: {}
-        )
-        .previewDisplayName("Quote Picker Sheet")
+        Group {
+            QuotePickerSheet(
+                quotes: [],
+                isLoading: true,
+                errorMessage: nil,
+                onSelect: { _ in },
+                onRetry: {},
+                onClose: {}
+            )
+            .previewDisplayName("Quote Picker Loading")
+
+            QuotePickerSheet(
+                quotes: MockQuotes.all,
+                isLoading: false,
+                errorMessage: nil,
+                onSelect: { _ in },
+                onRetry: {},
+                onClose: {}
+            )
+            .previewDisplayName("Quote Picker Success")
+
+            QuotePickerSheet(
+                quotes: [],
+                isLoading: false,
+                errorMessage: "Could not load quotes. Check backend and retry.",
+                onSelect: { _ in },
+                onRetry: {},
+                onClose: {}
+            )
+            .previewDisplayName("Quote Picker Failure")
+        }
     }
 }
 #endif

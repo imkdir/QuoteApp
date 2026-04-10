@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 
+@MainActor
 final class MainViewModel: ObservableObject {
     @Published var sessionState: MainSessionState
     @Published var isQuotePickerPresented: Bool
@@ -8,8 +9,11 @@ final class MainViewModel: ObservableObject {
     @Published var spokenTokenCount: Int
     @Published var feedbackSheetAnalysis: PracticeAnalysis?
     @Published var tutorPlaybackState: TutorPlaybackState
+    @Published var quotes: [Quote]
+    @Published var isLoadingQuotes: Bool
+    @Published var quoteLoadingErrorMessage: String?
 
-    let quotes: [Quote]
+    private let quoteRepository: (any QuoteRepository)?
 
     private var nextMockResultCursor: Int
     private let mockResultOrder: [AnalysisState] = [.info, .perfect, .unavailable]
@@ -17,21 +21,27 @@ final class MainViewModel: ObservableObject {
 
     init(
         quotes: [Quote] = MockQuotes.all,
+        quoteRepository: (any QuoteRepository)? = nil,
         sessionState: MainSessionState = .start,
         isQuotePickerPresented: Bool = false,
         spokenTokenCount: Int = 0,
         feedbackSheetAnalysis: PracticeAnalysis? = nil,
         tutorPlaybackState: TutorPlaybackState = .pausedOrFinished,
+        isLoadingQuotes: Bool = false,
+        quoteLoadingErrorMessage: String? = nil,
         nextMockResultCursor: Int = 0,
         pendingMockOutcomes: [UUID: AnalysisState] = [:]
     ) {
         self.quotes = quotes
+        self.quoteRepository = quoteRepository
         self.sessionState = sessionState
         self.isQuotePickerPresented = isQuotePickerPresented
         self.practiceStatusMessage = "Tap Repeat to advance spoken words."
         self.spokenTokenCount = spokenTokenCount
         self.feedbackSheetAnalysis = feedbackSheetAnalysis
         self.tutorPlaybackState = tutorPlaybackState
+        self.isLoadingQuotes = isLoadingQuotes
+        self.quoteLoadingErrorMessage = quoteLoadingErrorMessage
         self.nextMockResultCursor = nextMockResultCursor
         self.pendingMockOutcomes = pendingMockOutcomes
     }
@@ -94,10 +104,15 @@ final class MainViewModel: ObservableObject {
 
     func openQuotePicker() {
         isQuotePickerPresented = true
+        loadQuotesIfNeeded()
     }
 
     func closeQuotePicker() {
         isQuotePickerPresented = false
+    }
+
+    func retryQuoteLoading() {
+        loadQuotes(force: true)
     }
 
     func selectQuote(_ quote: Quote) {
@@ -107,6 +122,51 @@ final class MainViewModel: ObservableObject {
         tutorPlaybackState = .pausedOrFinished
         feedbackSheetAnalysis = nil
         practiceStatusMessage = "All words are dimmed. Tap Repeat to mock playback."
+    }
+
+    private func loadQuotesIfNeeded() {
+        guard quoteRepository != nil else {
+            return
+        }
+
+        guard quotes.isEmpty else {
+            return
+        }
+
+        guard !isLoadingQuotes else {
+            return
+        }
+
+        loadQuotes(force: true)
+    }
+
+    private func loadQuotes(force: Bool) {
+        guard let quoteRepository else {
+            return
+        }
+
+        if !force && !quotes.isEmpty {
+            return
+        }
+
+        guard !isLoadingQuotes else {
+            return
+        }
+
+        isLoadingQuotes = true
+        quoteLoadingErrorMessage = nil
+
+        Task {
+            do {
+                let backendQuotes = try await quoteRepository.fetchQuotes()
+                quotes = backendQuotes
+                quoteLoadingErrorMessage = nil
+            } catch {
+                quoteLoadingErrorMessage = "Could not load quotes. Check backend and retry."
+            }
+
+            isLoadingQuotes = false
+        }
     }
 
     func playbackTapped() {
@@ -332,6 +392,14 @@ final class MainViewModel: ObservableObject {
 }
 
 extension MainViewModel {
+    static func runtime(environment: AppEnvironment = .runtime) -> MainViewModel {
+        MainViewModel(
+            quotes: [],
+            quoteRepository: environment.quoteRepository,
+            quoteLoadingErrorMessage: nil
+        )
+    }
+
     static var previewStart: MainViewModel {
         MainViewModel()
     }
