@@ -66,6 +66,7 @@
 		73187205C69DF64DC2158CA7 /* QuoteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteService.swift; sourceTree = "<group>"; };
 		7C8570F36EDC859482832423 /* RecordingInputToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingInputToolbar.swift; sourceTree = "<group>"; };
 		80DA95C20205AF6E6CABF7E6 /* LiveKitSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitSessionManager.swift; sourceTree = "<group>"; };
+		82A0D30F2F8975DD0034CFC2 /* QuoteApp-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "QuoteApp-Info.plist"; sourceTree = "<group>"; };
 		8B4DCCC77A4D3A0AC74650A7 /* QuoteRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteRepository.swift; sourceTree = "<group>"; };
 		8B822AFE52F53F3DBBA85B3C /* UserRecordingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserRecordingManager.swift; sourceTree = "<group>"; };
 		957032671320A08B02D81657 /* ActionStackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionStackView.swift; sourceTree = "<group>"; };
@@ -115,6 +116,7 @@
 		05C34A80E2706DDA7A1F8029 = {
 			isa = PBXGroup;
 			children = (
+				82A0D30F2F8975DD0034CFC2 /* QuoteApp-Info.plist */,
 				C53FE3EC26C805ABECD6647D /* App */,
 				90D26174EFE849BE90890E08 /* Audio */,
 				5D95CC9D82F733C78D7B3CD9 /* Components */,
@@ -399,7 +401,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = DUDTP565G4;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "QuoteApp-Info.plist";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "QuoteApp uses the microphone so you can record yourself reading quotes for speaking practice.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -423,7 +427,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = DUDTP565G4;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "QuoteApp-Info.plist";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "QuoteApp uses the microphone so you can record yourself reading quotes for speaking practice.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (

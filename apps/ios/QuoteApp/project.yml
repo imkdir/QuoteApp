@@ -1,6 +1,7 @@
 name: QuoteApp
 options:
   createIntermediateGroups: true
+  postGenCommand: bash scripts/verify_shared_scheme.sh
 settings:
   base:
     SWIFT_VERSION: 5.0
@@ -8,6 +9,19 @@ packages:
   LiveKit:
     url: https://github.com/livekit/client-sdk-swift.git
     from: 2.0.0
+schemes:
+  QuoteApp:
+    build:
+      targets:
+        QuoteApp: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
 targets:
   QuoteApp:
     type: application
@@ -32,6 +46,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "QuoteApp uses the microphone so you can record yourself reading quotes for speaking practice."
         CURRENT_PROJECT_VERSION: 1
         MARKETING_VERSION: 1.0
         CODE_SIGN_STYLE: Automatic
