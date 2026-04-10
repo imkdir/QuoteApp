@@ -7,15 +7,22 @@ final class MainViewModel: ObservableObject {
     @Published var practiceStatusMessage: String
     @Published var spokenTokenCount: Int
     @Published var markedTokens: [MarkedToken]
+    @Published var actionToolbarState: ActionToolbarState
+    @Published var recordingToolbarState: RecordingInputToolbarState
 
     let quotes: [Quote]
+
+    private var nextSendOutcomeCursor: Int = 0
+    private let sendOutcomeOrder: [ActionToolbarState] = [.reviewedInfo, .reviewedPerfect, .unavailable]
 
     init(
         quotes: [Quote] = MockQuotes.all,
         sessionState: MainSessionState = .start,
         isQuotePickerPresented: Bool = false,
         spokenTokenCount: Int = 0,
-        markedTokens: [MarkedToken] = []
+        markedTokens: [MarkedToken] = [],
+        actionToolbarState: ActionToolbarState = .default,
+        recordingToolbarState: RecordingInputToolbarState = .recording
     ) {
         self.quotes = quotes
         self.sessionState = sessionState
@@ -23,6 +30,8 @@ final class MainViewModel: ObservableObject {
         self.practiceStatusMessage = "Tap Repeat to advance spoken words."
         self.spokenTokenCount = spokenTokenCount
         self.markedTokens = markedTokens
+        self.actionToolbarState = actionToolbarState
+        self.recordingToolbarState = recordingToolbarState
     }
 
     var currentQuoteTokens: [QuoteToken] {
@@ -49,10 +58,95 @@ final class MainViewModel: ObservableObject {
         isQuotePickerPresented = false
         spokenTokenCount = 0
         markedTokens = []
+        actionToolbarState = .default
+        recordingToolbarState = .recording
         practiceStatusMessage = "All words are dimmed. Tap Repeat to mock playback."
     }
 
-    func repeatTapped() {
+    func playbackTapped() {
+        guard sessionState.isPractice else {
+            return
+        }
+
+        switch actionToolbarState {
+        case .speaking:
+            actionToolbarState = .pausedOrFinished
+            practiceStatusMessage = "Playback paused (mock)."
+
+        case .recording, .recordedReadyToSend:
+            break
+
+        default:
+            actionToolbarState = .speaking
+            advanceSpokenProgress()
+        }
+    }
+
+    func recordTapped() {
+        guard sessionState.isPractice else {
+            return
+        }
+
+        actionToolbarState = .recording
+        recordingToolbarState = .recording
+        practiceStatusMessage = "Recording started (mock)."
+    }
+
+    func stopRecordingTapped() {
+        guard actionToolbarState == .recording else {
+            return
+        }
+
+        recordingToolbarState = .stopped
+        actionToolbarState = .recordedReadyToSend
+        practiceStatusMessage = "Recording stopped. Ready to send (mock)."
+    }
+
+    func closeRecordingTapped() {
+        guard actionToolbarState == .recording || actionToolbarState == .recordedReadyToSend else {
+            return
+        }
+
+        recordingToolbarState = .recording
+        actionToolbarState = .default
+        practiceStatusMessage = "Recording dismissed. Back to default controls."
+    }
+
+    func sendTapped() {
+        guard actionToolbarState == .recordedReadyToSend else {
+            return
+        }
+
+        actionToolbarState = .reviewing
+
+        let nextOutcome = sendOutcomeOrder[nextSendOutcomeCursor]
+        nextSendOutcomeCursor = (nextSendOutcomeCursor + 1) % sendOutcomeOrder.count
+        applyReviewOutcome(nextOutcome)
+
+        recordingToolbarState = .recording
+    }
+
+    func reviewTapped() {
+        guard sessionState.isPractice else {
+            return
+        }
+
+        switch actionToolbarState {
+        case .reviewing:
+            break
+        case .reviewedInfo:
+            applyReviewOutcome(.reviewedPerfect)
+        case .reviewedPerfect:
+            applyReviewOutcome(.unavailable)
+        case .unavailable:
+            applyReviewOutcome(.reviewedInfo)
+        default:
+            actionToolbarState = .reviewing
+            practiceStatusMessage = "Reviewing (mock)."
+        }
+    }
+
+    private func advanceSpokenProgress() {
         guard let selectedQuote = sessionState.selectedQuote else {
             return
         }
@@ -60,29 +154,32 @@ final class MainViewModel: ObservableObject {
         spokenTokenCount = min(spokenTokenCount + 3, selectedQuote.wordCount)
 
         if spokenTokenCount >= selectedQuote.wordCount {
-            practiceStatusMessage = "Playback mock reached the end."
+            actionToolbarState = .pausedOrFinished
+            practiceStatusMessage = "Playback finished (mock)."
         } else {
-            practiceStatusMessage = "Playback mock advanced to word \(spokenTokenCount)."
+            practiceStatusMessage = "Tutor speaking mock advanced to word \(spokenTokenCount)."
         }
     }
 
-    func recordTapped() {
-        spokenTokenCount = 0
-        markedTokens = []
-        practiceStatusMessage = "Progress reset. All words are dimmed again."
-    }
+    private func applyReviewOutcome(_ outcome: ActionToolbarState) {
+        actionToolbarState = outcome
 
-    func reviewTapped() {
         guard let selectedQuote = sessionState.selectedQuote else {
             return
         }
 
-        if markedTokens.isEmpty {
+        switch outcome {
+        case .reviewedInfo:
             markedTokens = sampleMarkedTokens(for: selectedQuote)
-            practiceStatusMessage = "Mock review: sample words are now underlined."
-        } else {
+            practiceStatusMessage = "Reviewed (info): sample words are underlined."
+        case .reviewedPerfect:
             markedTokens = []
-            practiceStatusMessage = "Mock review cleared."
+            practiceStatusMessage = "Reviewed (perfect): no marked words."
+        case .unavailable:
+            markedTokens = []
+            practiceStatusMessage = "Review unavailable (mock)."
+        default:
+            break
         }
     }
 
@@ -114,14 +211,64 @@ extension MainViewModel {
 
     static var previewPracticePartiallySpoken: MainViewModel {
         let viewModel = MainViewModel.previewPracticeAllDimmed
-        viewModel.repeatTapped()
-        viewModel.repeatTapped()
+        viewModel.playbackTapped()
+        viewModel.playbackTapped()
         return viewModel
     }
 
     static var previewPracticeMarked: MainViewModel {
         let viewModel = MainViewModel.previewPracticePartiallySpoken
-        viewModel.reviewTapped()
+        viewModel.applyReviewOutcome(.reviewedInfo)
+        return viewModel
+    }
+
+    static var previewActionStateSpeaking: MainViewModel {
+        let viewModel = MainViewModel.previewPracticeAllDimmed
+        viewModel.actionToolbarState = .speaking
+        return viewModel
+    }
+
+    static var previewActionStatePaused: MainViewModel {
+        let viewModel = MainViewModel.previewPracticeAllDimmed
+        viewModel.actionToolbarState = .pausedOrFinished
+        return viewModel
+    }
+
+    static var previewActionStateRecording: MainViewModel {
+        let viewModel = MainViewModel.previewPracticeAllDimmed
+        viewModel.actionToolbarState = .recording
+        viewModel.recordingToolbarState = .recording
+        return viewModel
+    }
+
+    static var previewActionStateSendReady: MainViewModel {
+        let viewModel = MainViewModel.previewPracticeAllDimmed
+        viewModel.actionToolbarState = .recordedReadyToSend
+        viewModel.recordingToolbarState = .stopped
+        return viewModel
+    }
+
+    static var previewActionStateReviewing: MainViewModel {
+        let viewModel = MainViewModel.previewPracticeAllDimmed
+        viewModel.actionToolbarState = .reviewing
+        return viewModel
+    }
+
+    static var previewActionStateReviewedInfo: MainViewModel {
+        let viewModel = MainViewModel.previewPracticeAllDimmed
+        viewModel.applyReviewOutcome(.reviewedInfo)
+        return viewModel
+    }
+
+    static var previewActionStateReviewedPerfect: MainViewModel {
+        let viewModel = MainViewModel.previewPracticeAllDimmed
+        viewModel.applyReviewOutcome(.reviewedPerfect)
+        return viewModel
+    }
+
+    static var previewActionStateUnavailable: MainViewModel {
+        let viewModel = MainViewModel.previewPracticeAllDimmed
+        viewModel.applyReviewOutcome(.unavailable)
         return viewModel
     }
 }

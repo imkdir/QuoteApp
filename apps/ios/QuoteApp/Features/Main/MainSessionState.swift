@@ -11,4 +11,8 @@ enum MainSessionState: Equatable {
 
         return quote
     }
+
+    var isPractice: Bool {
+        selectedQuote != nil
+    }
 }

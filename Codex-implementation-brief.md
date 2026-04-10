@@ -158,54 +158,77 @@ The bottom action area should stay simple and close to the mock.
 Use SF Symbols when they naturally fit the action and status language.
 Keep the styling flat and system-like.
 
-### Playback action
+### Action visibility rule
 
-* show `Pause` while tutor audio is actively playing
-* show `Repeat` when tutor audio is paused or finished
-* use `pause.circle.fill` and `play.circle.fill`
-* hide when not relevant
+The action stack is state-driven and should not show all control groups at the same time.
+
+Only one action mode should be visible at a time:
+
+- **playback mode**
+  - used when the tutor is speaking, paused, or finished
+  - may show `Pause` or `Repeat`
+
+- **recording mode**
+  - used when the learner is actively recording
+  - only recording controls should be visible
+
+- **send-ready mode**
+  - used when a learner recording exists locally but has not been sent yet
+  - only the recording toolbar and `Send` action should be visible
+
+- **review mode**
+  - used when the app is reviewing or has already produced a review result
+  - may show `Reviewing`, `Reviewed`, or `Unavailable`
+
+Exclusivity rule:
+- while a learner recording is active, hide playback and review controls
+- while a stopped learner recording is still present and ready to send, hide playback and review controls
+- playback and review controls may reappear only when there is no active or preserved learner recording in the toolbar
+
+### Playback action
+- show `Pause` while tutor audio is actively playing
+- show `Repeat` when tutor audio is paused or finished
+- use `pause.circle.fill` and `play.circle.fill`
+- hide playback controls whenever the recording toolbar is active or a local recording is present
 
 ### Recording action
-
 Default state:
-
-* show a `Record` action in the right toolbar using `waveform.circle.fill`
+- show a `Record` action in the right toolbar using `waveform.circle.fill`
 
 When record is pressed:
-
-* the record button disappears from the right toolbar
-* a standalone `RecordingInputToolbar` component appears on the left side
-* `RecordingInputToolbar` owns its own visual states and interaction states
-* the recording input uses a glass-style toolbar background
-* the recording input contains a live waveform view
-* the recording input shows a stop action at the right edge using `stop.circle.fill`
+- the record button disappears from the right toolbar
+- a standalone `RecordingInputToolbar` component appears on the left side
+- `RecordingInputToolbar` owns its own visual states and interaction states
+- the recording input uses a glass-style toolbar background
+- the recording input contains a live waveform view
+- the recording input shows a stop action at the right edge using `stop.circle.fill`
 
 When stop is pressed:
+- `RecordingInputToolbar` stays visible
+- it switches to a stopped-recording state internally
+- it shows a close action at the right edge using `xmark.circle.fill`
+- pressing close resets the recording input back to its default hidden/inactive state
+- the right toolbar shows `Send` using `arrow.up.circle.fill`
+- the `Send` action should be visually tinted blue and feel like the primary next action
 
-* `RecordingInputToolbar` stays visible
-* it switches to a stopped-recording state internally
-* it shows a close action at the right edge using `xmark.circle.fill`
-* pressing close resets the recording input back to its default hidden/inactive state
-* the right toolbar shows `Send` using `arrow.up.circle.fill`
-* the `Send` action should be visually tinted blue and feel like the primary next action
+While the recording toolbar is visible:
+- hide playback controls
+- hide review controls
 
 ### Analysis action
-
 Show a compact `Review` action or status control with one of:
-
-* `Reviewing` using `arrow.down.message.fill`
-* `Reviewed` using:
-
-  * `checkmark.message.fill` when the result is effectively perfect
-  * `ellipsis.message.fill` when the result contains marks / info
-* `Unavailable` using `exclamationmark.message.fill`
+- `Reviewing` using `arrow.down.message.fill`
+- `Reviewed` using:
+  - `checkmark.message.fill` when the result is effectively perfect
+  - `ellipsis.message.fill` when the result contains marks / info
+- `Unavailable` using `exclamationmark.message.fill`
 
 Behavior:
-
-* `Reviewing` is not tappable
-* `Reviewed` is tappable and opens review details if needed
-* `Unavailable` is tappable and explains that review could not be completed via a simple bottom sheet
-* `Reviewed` visually covers both internal `info` and `perfect`, while the app state still distinguishes them
+- `Reviewing` is not tappable
+- `Reviewed` is tappable and opens review details if needed
+- `Unavailable` is tappable and explains that review could not be completed via a simple bottom sheet
+- `Reviewed` visually covers both internal `info` and `perfect`, while the app state still distinguishes them
+- hide review controls whenever the recording toolbar is active or a local recording is present
 
 ---
 
@@ -771,4 +794,3 @@ Polish transitions and cleanup README/setup.
 * Do not over-engineer pronunciation scoring.
 * The most important thing is a believable end-to-end speaking-practice loop.
 * Prefer clear state transitions over feature breadth.
-

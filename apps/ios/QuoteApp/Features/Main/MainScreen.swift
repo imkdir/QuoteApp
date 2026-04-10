@@ -58,9 +58,14 @@ struct MainScreen: View {
             Spacer(minLength: 20)
 
             ActionStackView(
-                onRepeat: viewModel.repeatTapped,
-                onRecord: viewModel.recordTapped,
-                onReview: viewModel.reviewTapped
+                toolbarState: viewModel.actionToolbarState,
+                recordingToolbarState: viewModel.recordingToolbarState,
+                onPlaybackTapped: viewModel.playbackTapped,
+                onRecordTapped: viewModel.recordTapped,
+                onStopRecordingTapped: viewModel.stopRecordingTapped,
+                onCloseRecordingTapped: viewModel.closeRecordingTapped,
+                onSendTapped: viewModel.sendTapped,
+                onReviewTapped: viewModel.reviewTapped
             )
 
             Text(viewModel.practiceStatusMessage)
@@ -78,14 +83,29 @@ struct MainScreen_Previews: PreviewProvider {
             MainScreen(viewModel: .previewStart)
                 .previewDisplayName("Start State")
 
-            MainScreen(viewModel: .previewPracticeAllDimmed)
-                .previewDisplayName("Practice All Dimmed")
+            MainScreen(viewModel: .previewActionStateSpeaking)
+                .previewDisplayName("Speaking")
 
-            MainScreen(viewModel: .previewPracticePartiallySpoken)
-                .previewDisplayName("Practice Partially Spoken")
+            MainScreen(viewModel: .previewActionStatePaused)
+                .previewDisplayName("Paused/Finished")
 
-            MainScreen(viewModel: .previewPracticeMarked)
-                .previewDisplayName("Practice Marked Words")
+            MainScreen(viewModel: .previewActionStateRecording)
+                .previewDisplayName("Recording")
+
+            MainScreen(viewModel: .previewActionStateSendReady)
+                .previewDisplayName("Stopped/Send Ready")
+
+            MainScreen(viewModel: .previewActionStateReviewing)
+                .previewDisplayName("Reviewing")
+
+            MainScreen(viewModel: .previewActionStateReviewedInfo)
+                .previewDisplayName("Reviewed Info")
+
+            MainScreen(viewModel: .previewActionStateReviewedPerfect)
+                .previewDisplayName("Reviewed Perfect")
+
+            MainScreen(viewModel: .previewActionStateUnavailable)
+                .previewDisplayName("Unavailable")
         }
     }
 }
