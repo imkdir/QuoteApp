@@ -50,7 +50,7 @@ final class MainViewModel: ObservableObject {
             tutorPlaybackState: tutorPlaybackState,
             localRecordingDraftState: session.localRecordingDraft?.state,
             latestAttemptReviewState: latestAttemptReviewState,
-            hasAttemptHistory: !session.attempts.isEmpty
+            hasAttemptHistory: session.hasAttemptHistory
         )
     }
 
@@ -225,6 +225,7 @@ final class MainViewModel: ObservableObject {
 
         switch latestAnalysis.state {
         case .loading:
+            practiceStatusMessage = "Review is still in progress."
             return
         case .info, .perfect, .unavailable:
             feedbackSheetAnalysis = latestAnalysis

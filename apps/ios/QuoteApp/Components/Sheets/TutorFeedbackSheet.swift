@@ -37,7 +37,7 @@ struct TutorFeedbackSheet: View {
         case .unavailable:
             return "Review unavailable"
         case .loading:
-            return "Reviewing"
+            return "Still reviewing"
         }
     }
 
@@ -52,7 +52,7 @@ struct TutorFeedbackSheet: View {
         case .perfect:
             return "You delivered this quote clearly and naturally."
         case .unavailable:
-            return "We could not complete this review yet."
+            return "We could not complete review for this attempt."
         case .loading:
             return "Reviewing your latest attempt."
         }

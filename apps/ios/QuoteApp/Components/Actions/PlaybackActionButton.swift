@@ -37,6 +37,7 @@ struct PlaybackActionButton: View {
         .tint(.gray.opacity(0.2))
         .foregroundStyle(.blue)
         .accessibilityLabel(mode.title)
+        .accessibilityHint(mode == .pause ? "Pauses tutor playback" : "Restarts tutor playback")
     }
 }
 

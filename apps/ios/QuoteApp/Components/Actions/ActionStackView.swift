@@ -34,6 +34,7 @@ struct ActionStackView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
+        .animation(.easeInOut(duration: 0.15), value: toolbarState)
     }
 
     private var recordingFlowLayout: some View {
@@ -43,12 +44,14 @@ struct ActionStackView: View {
                 onStop: onStopRecordingTapped,
                 onClose: onCloseRecordingTapped
             )
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if toolbarState.showsSendButton {
                 sendButton
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.easeInOut(duration: 0.15), value: toolbarState)
     }
 
     @ViewBuilder
@@ -91,16 +94,16 @@ struct ActionStackView_Previews: PreviewProvider {
                     latestAttemptReviewState: .none,
                     hasAttemptHistory: false
                 ),
-                title: "Speaking"
+                title: "Speaking (No Attempts)"
             )
             preview(
                 toolbarState: ActionToolbarState(
-                    tutorPlaybackState: .pausedOrFinished,
+                    tutorPlaybackState: .speaking,
                     localRecordingDraftState: nil,
-                    latestAttemptReviewState: .none,
-                    hasAttemptHistory: false
+                    latestAttemptReviewState: .info,
+                    hasAttemptHistory: true
                 ),
-                title: "Paused"
+                title: "Speaking (With History)"
             )
             preview(
                 toolbarState: ActionToolbarState(
@@ -127,7 +130,7 @@ struct ActionStackView_Previews: PreviewProvider {
                     latestAttemptReviewState: .loading,
                     hasAttemptHistory: true
                 ),
-                title: "Reviewing"
+                title: "Latest Loading"
             )
             preview(
                 toolbarState: ActionToolbarState(
@@ -136,7 +139,25 @@ struct ActionStackView_Previews: PreviewProvider {
                     latestAttemptReviewState: .info,
                     hasAttemptHistory: true
                 ),
-                title: "Reviewed Info"
+                title: "Latest Info"
+            )
+            preview(
+                toolbarState: ActionToolbarState(
+                    tutorPlaybackState: .pausedOrFinished,
+                    localRecordingDraftState: nil,
+                    latestAttemptReviewState: .perfect,
+                    hasAttemptHistory: true
+                ),
+                title: "Latest Perfect"
+            )
+            preview(
+                toolbarState: ActionToolbarState(
+                    tutorPlaybackState: .pausedOrFinished,
+                    localRecordingDraftState: nil,
+                    latestAttemptReviewState: .unavailable,
+                    hasAttemptHistory: true
+                ),
+                title: "Latest Unavailable"
             )
         }
         .padding()

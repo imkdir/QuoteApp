@@ -19,8 +19,12 @@ struct ActionToolbarState: Equatable {
     let latestAttemptReviewState: LatestAttemptReviewState
     let hasAttemptHistory: Bool
 
+    var isInRecordingExclusiveMode: Bool {
+        localRecordingDraftState != nil
+    }
+
     var playbackMode: PlaybackActionButton.Mode? {
-        guard localRecordingDraftState == nil else {
+        guard !isInRecordingExclusiveMode else {
             return nil
         }
 
@@ -33,7 +37,7 @@ struct ActionToolbarState: Equatable {
     }
 
     var reviewState: ReviewStatusButton.State? {
-        guard localRecordingDraftState == nil else {
+        guard !isInRecordingExclusiveMode else {
             return nil
         }
 
@@ -56,11 +60,11 @@ struct ActionToolbarState: Equatable {
     }
 
     var showsRecordingToolbar: Bool {
-        localRecordingDraftState != nil
+        isInRecordingExclusiveMode
     }
 
     var showsRecordButton: Bool {
-        localRecordingDraftState == nil
+        !isInRecordingExclusiveMode
     }
 
     var showsReviewButton: Bool {

@@ -96,9 +96,6 @@ struct MainScreen_Previews: PreviewProvider {
             MainScreen(viewModel: .previewReviewedInfoLatestAttempt)
                 .previewDisplayName("Latest Attempt Reviewed Info")
 
-            MainScreen(viewModel: .previewReviewedInfoPresented)
-                .previewDisplayName("Latest Info (Sheet Presented)")
-
             MainScreen(viewModel: .previewReviewedPerfectLatestAttempt)
                 .previewDisplayName("Latest Attempt Reviewed Perfect")
 

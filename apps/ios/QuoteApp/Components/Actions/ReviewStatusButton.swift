@@ -15,9 +15,9 @@ struct ReviewStatusButton: View {
             case .reviewing:
                 return "Reviewing"
             case .reviewedInfo:
-                return "Reviewed"
+                return "Reviewed Info"
             case .reviewedPerfect:
-                return "Reviewed"
+                return "Reviewed Perfect"
             case .unavailable:
                 return "Unavailable"
             }
@@ -50,16 +50,18 @@ struct ReviewStatusButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button(action: handleTap) {
             Image(systemName: state.systemImage)
                 .font(.title3.weight(.semibold))
                 .frame(width: 44, height: 44)
         }
         .buttonStyle(.borderedProminent)
-        .tint(.gray.opacity(0.2))
+        .tint(.gray.opacity(state == .reviewing ? 0.15 : 0.2))
         .foregroundStyle(iconForegroundColor)
+        .opacity(state == .reviewing ? 0.72 : 1.0)
         .disabled(!state.isTappable)
         .accessibilityLabel(state.title)
+        .accessibilityHint(accessibilityHint)
     }
 
     private var iconForegroundColor: Color {
@@ -68,9 +70,28 @@ struct ReviewStatusButton: View {
             return .orange
         case .reviewedPerfect:
             return .green
+        case .reviewing:
+            return .secondary
         default:
             return .blue
         }
+    }
+
+    private var accessibilityHint: String {
+        switch state {
+        case .reviewing:
+            return "Review is in progress"
+        case .reviewedInfo, .reviewedPerfect, .unavailable, .review:
+            return "Opens review details"
+        }
+    }
+
+    private func handleTap() {
+        guard state.isTappable else {
+            return
+        }
+
+        action()
     }
 }
 

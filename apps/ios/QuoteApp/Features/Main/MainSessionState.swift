@@ -40,6 +40,14 @@ struct PracticeSession: Equatable {
     var latestAnalysis: PracticeAnalysis? {
         latestAttempt?.analysis
     }
+
+    var hasAttemptHistory: Bool {
+        !attempts.isEmpty
+    }
+
+    var hasLocalRecordingDraft: Bool {
+        localRecordingDraft != nil
+    }
 }
 
 enum MainSessionState: Equatable {
