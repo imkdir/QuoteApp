@@ -72,6 +72,7 @@ struct MainScreen: View {
 
             ActionStackView(
                 toolbarState: viewModel.actionToolbarState,
+                recordingWaveformLevels: viewModel.recordingWaveformLevels,
                 onPlaybackTapped: viewModel.playbackTapped,
                 onRecordTapped: viewModel.recordTapped,
                 onStopRecordingTapped: viewModel.stopRecordingTapped,
@@ -112,6 +113,9 @@ struct MainScreen_Previews: PreviewProvider {
 
             MainScreen(viewModel: .previewSendReadyWithOlderReviewedAttempt)
                 .previewDisplayName("Send Ready + Older Reviewed Attempt")
+
+            MainScreen(viewModel: .previewMicrophoneDenied)
+                .previewDisplayName("Microphone Denied")
         }
     }
 }

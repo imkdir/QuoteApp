@@ -1,4 +1,5 @@
 import Combine
+import CoreGraphics
 import Foundation
 
 @MainActor
@@ -24,12 +25,14 @@ final class MainViewModel: ObservableObject {
     @Published var isLoadingQuotes: Bool
     @Published var quoteLoadingErrorMessage: String?
     @Published var liveKitConnectionState: LiveKitConnectionState
+    @Published var recordingWaveformLevels: [CGFloat]
 
     private let quoteRepository: (any QuoteRepository)?
     private let practiceRepository: (any PracticeRepository)?
     private let analysisPollingService: AnalysisPollingService?
     private let liveKitSessionManager: LiveKitSessionManager?
     private let audioSessionManager: AudioSessionManager?
+    private let userRecordingManager: UserRecordingManager?
     private let tutorPlaybackManager: TutorPlaybackManager?
 
     private var sessionStartTask: Task<String, Error>?
@@ -47,6 +50,7 @@ final class MainViewModel: ObservableObject {
         analysisPollingService: AnalysisPollingService? = nil,
         liveKitSessionManager: LiveKitSessionManager? = nil,
         audioSessionManager: AudioSessionManager? = nil,
+        userRecordingManager: UserRecordingManager? = nil,
         tutorPlaybackManager: TutorPlaybackManager? = nil,
         sessionState: MainSessionState = .start,
         isQuotePickerPresented: Bool = false,
@@ -64,6 +68,7 @@ final class MainViewModel: ObservableObject {
         self.analysisPollingService = analysisPollingService
         self.liveKitSessionManager = liveKitSessionManager
         self.audioSessionManager = audioSessionManager
+        self.userRecordingManager = userRecordingManager
         self.tutorPlaybackManager = tutorPlaybackManager
         self.sessionState = sessionState
         self.isQuotePickerPresented = isQuotePickerPresented
@@ -76,8 +81,10 @@ final class MainViewModel: ObservableObject {
         self.nextMockResultCursor = nextMockResultCursor
         self.participantIdentity = participantIdentity
         self.liveKitConnectionState = liveKitSessionManager?.connectionState ?? .disconnected
+        self.recordingWaveformLevels = userRecordingManager?.meterLevels ?? Self.defaultWaveformLevels
 
         bindLiveKitState()
+        bindRecordingState()
     }
 
     var actionToolbarState: ActionToolbarState {
@@ -178,6 +185,8 @@ final class MainViewModel: ObservableObject {
         return false
     }
 
+    private static let defaultWaveformLevels = Array(repeating: CGFloat(0.12), count: 16)
+
     func openQuotePicker() {
         isQuotePickerPresented = true
         loadQuotesIfNeeded()
@@ -203,6 +212,8 @@ final class MainViewModel: ObservableObject {
         spokenTokenCount = 0
         tutorPlaybackState = .pausedOrFinished
         feedbackSheetAnalysis = nil
+        userRecordingManager?.clearRecording()
+        recordingWaveformLevels = userRecordingManager?.meterLevels ?? Self.defaultWaveformLevels
         practiceStatusMessage = "All words are dimmed. Tap Repeat to mock playback."
 
         guard practiceRepository != nil else {
@@ -308,19 +319,43 @@ final class MainViewModel: ObservableObject {
         }
 
         supersedeActiveLoadingAttemptForUI()
-
-        let reference = "local-draft-\(Int(Date().timeIntervalSince1970))"
-
-        updatePracticeSession { session in
-            session.localRecordingDraft = LocalRecordingDraft(
-                recordingReference: reference,
-                state: .recording
-            )
-        }
-
         feedbackSheetAnalysis = nil
         tutorPlaybackState = .pausedOrFinished
-        practiceStatusMessage = "Recording started (mock)."
+
+        guard let userRecordingManager else {
+            let reference = "local-draft-\(Int(Date().timeIntervalSince1970))"
+            updatePracticeSession { session in
+                session.localRecordingDraft = LocalRecordingDraft(
+                    recordingReference: reference,
+                    state: .recording
+                )
+            }
+            practiceStatusMessage = "Recording started (mock)."
+            return
+        }
+
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let fileURL = try await userRecordingManager.startRecording(
+                    audioSessionManager: self.audioSessionManager
+                )
+                self.updatePracticeSession { session in
+                    session.localRecordingDraft = LocalRecordingDraft(
+                        recordingReference: fileURL.path,
+                        state: .recording
+                    )
+                }
+                self.practiceStatusMessage = "Recording started."
+            } catch UserRecordingManager.RecordingError.microphonePermissionDenied {
+                self.practiceStatusMessage = "Microphone permission denied. Enable it in Settings to record."
+            } catch {
+                self.practiceStatusMessage = "Could not start recording."
+            }
+        }
     }
 
     func stopRecordingTapped() {
@@ -328,16 +363,32 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        updatePracticeSession { session in
-            guard var localDraft = session.localRecordingDraft else {
-                return
+        guard let userRecordingManager else {
+            updatePracticeSession { session in
+                guard var localDraft = session.localRecordingDraft else {
+                    return
+                }
+
+                localDraft.state = .stopped
+                session.localRecordingDraft = localDraft
             }
 
-            localDraft.state = .stopped
-            session.localRecordingDraft = localDraft
+            practiceStatusMessage = "Recording stopped. Ready to send (mock)."
+            return
         }
 
-        practiceStatusMessage = "Recording stopped. Ready to send (mock)."
+        do {
+            let fileURL = try userRecordingManager.stopRecording()
+            updatePracticeSession { session in
+                session.localRecordingDraft = LocalRecordingDraft(
+                    recordingReference: fileURL.path,
+                    state: .stopped
+                )
+            }
+            practiceStatusMessage = "Recording stopped. Ready to send."
+        } catch {
+            practiceStatusMessage = "No active recording to stop."
+        }
     }
 
     func closeRecordingTapped() {
@@ -345,6 +396,7 @@ final class MainViewModel: ObservableObject {
             return
         }
 
+        userRecordingManager?.clearRecording()
         updatePracticeSession { session in
             session.localRecordingDraft = nil
         }
@@ -367,6 +419,7 @@ final class MainViewModel: ObservableObject {
         }
 
         let attemptID = UUID()
+        userRecordingManager?.clearRecording()
         let newAttempt = PracticeAttempt(
             id: attemptID,
             recordingReference: localDraft.recordingReference,
@@ -544,6 +597,19 @@ final class MainViewModel: ObservableObject {
                 }
                 self.liveKitConnectionState = state
                 self.tutorPlaybackManager?.applyLiveKitConnectionState(state)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func bindRecordingState() {
+        guard let userRecordingManager else {
+            return
+        }
+
+        userRecordingManager.$meterLevels
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] levels in
+                self?.recordingWaveformLevels = levels
             }
             .store(in: &cancellables)
     }
@@ -749,6 +815,7 @@ extension MainViewModel {
             analysisPollingService: environment.analysisPollingService,
             liveKitSessionManager: environment.liveKitSessionManager,
             audioSessionManager: environment.audioSessionManager,
+            userRecordingManager: environment.userRecordingManager,
             tutorPlaybackManager: environment.tutorPlaybackManager,
             quoteLoadingErrorMessage: nil
         )
@@ -806,6 +873,17 @@ extension MainViewModel {
             )
         }
         viewModel.practiceStatusMessage = "Recording stopped. Ready to send (mock)."
+        return viewModel
+    }
+
+    static var previewMicrophoneDenied: MainViewModel {
+        let viewModel = MainViewModel()
+        guard let quote = viewModel.quotes.first else {
+            return viewModel
+        }
+
+        viewModel.sessionState = .practice(PracticeSession(quote: quote))
+        viewModel.practiceStatusMessage = "Microphone permission denied. Enable it in Settings to record."
         return viewModel
     }
 

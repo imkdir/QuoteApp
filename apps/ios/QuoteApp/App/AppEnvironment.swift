@@ -7,6 +7,7 @@ struct AppEnvironment {
     let analysisPollingService: AnalysisPollingService
     let liveKitSessionManager: LiveKitSessionManager
     let audioSessionManager: AudioSessionManager
+    let userRecordingManager: UserRecordingManager
     let tutorPlaybackManager: TutorPlaybackManager
 
     @MainActor
@@ -31,6 +32,7 @@ struct AppEnvironment {
             analysisPollingService: AnalysisPollingService(),
             liveKitSessionManager: LiveKitSessionManager(tokenProvider: tokenProvider),
             audioSessionManager: AudioSessionManager(),
+            userRecordingManager: UserRecordingManager(),
             tutorPlaybackManager: TutorPlaybackManager()
         )
     }

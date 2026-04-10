@@ -3,6 +3,12 @@ import Foundation
 
 @MainActor
 final class AudioSessionManager {
+    enum MicrophonePermission: Equatable {
+        case undetermined
+        case denied
+        case granted
+    }
+
     enum AudioSessionError: LocalizedError {
         case setupFailed(String)
 
@@ -21,6 +27,19 @@ final class AudioSessionManager {
     }
 
     private(set) var state: AudioSessionState = .idle
+
+    var microphonePermission: MicrophonePermission {
+        switch AVAudioSession.sharedInstance().recordPermission {
+        case .granted:
+            return .granted
+        case .denied:
+            return .denied
+        case .undetermined:
+            return .undetermined
+        @unknown default:
+            return .denied
+        }
+    }
 
     func configureForVoiceInteraction() throws {
         let session = AVAudioSession.sharedInstance()
@@ -47,9 +66,16 @@ final class AudioSessionManager {
     }
 
     func requestMicrophonePermission() async -> Bool {
-        await withCheckedContinuation { continuation in
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                continuation.resume(returning: granted)
+        switch microphonePermission {
+        case .granted:
+            return true
+        case .denied:
+            return false
+        case .undetermined:
+            return await withCheckedContinuation { continuation in
+                AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                    continuation.resume(returning: granted)
+                }
             }
         }
     }
