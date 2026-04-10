@@ -2,8 +2,6 @@ import SwiftUI
 
 struct ActionStackView: View {
     let toolbarState: ActionToolbarState
-    let reviewStatusState: ReviewStatusButton.State
-    let recordingToolbarState: RecordingInputToolbarState
     let onPlaybackTapped: () -> Void
     let onRecordTapped: () -> Void
     let onStopRecordingTapped: () -> Void
@@ -41,7 +39,7 @@ struct ActionStackView: View {
     private var recordingFlowLayout: some View {
         HStack(alignment: .center, spacing: 10) {
             RecordingInputToolbar(
-                state: recordingToolbarState,
+                state: toolbarState.recordingToolbarState,
                 onStop: onStopRecordingTapped,
                 onClose: onCloseRecordingTapped
             )
@@ -53,8 +51,11 @@ struct ActionStackView: View {
         }
     }
 
+    @ViewBuilder
     private var analysisGroup: some View {
-        ReviewStatusButton(state: reviewStatusState, action: onReviewTapped)
+        if let reviewState = toolbarState.reviewState {
+            ReviewStatusButton(state: reviewState, action: onReviewTapped)
+        }
     }
 
     private var recordButton: some View {
@@ -83,28 +84,71 @@ struct ActionStackView: View {
 struct ActionStackView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            preview(for: .speaking, recordingState: .recording, title: "Speaking")
-            preview(for: .pausedOrFinished, recordingState: .recording, title: "Paused or Finished")
-            preview(for: .recording, recordingState: .recording, title: "Recording")
-            preview(for: .recordedReadyToSend, recordingState: .stopped, title: "Stopped Send-Ready")
-            preview(for: .reviewing, recordingState: .recording, title: "Reviewing")
-            preview(for: .reviewedInfo, recordingState: .recording, title: "Reviewed Info")
-            preview(for: .reviewedPerfect, recordingState: .recording, title: "Reviewed Perfect")
-            preview(for: .unavailable, recordingState: .recording, title: "Unavailable")
+            preview(
+                toolbarState: ActionToolbarState(
+                    tutorPlaybackState: .speaking,
+                    localRecordingDraftState: nil,
+                    latestAttemptReviewState: .none,
+                    hasAttemptHistory: false
+                ),
+                title: "Speaking"
+            )
+            preview(
+                toolbarState: ActionToolbarState(
+                    tutorPlaybackState: .pausedOrFinished,
+                    localRecordingDraftState: nil,
+                    latestAttemptReviewState: .none,
+                    hasAttemptHistory: false
+                ),
+                title: "Paused"
+            )
+            preview(
+                toolbarState: ActionToolbarState(
+                    tutorPlaybackState: .pausedOrFinished,
+                    localRecordingDraftState: .recording,
+                    latestAttemptReviewState: .info,
+                    hasAttemptHistory: true
+                ),
+                title: "Recording Draft"
+            )
+            preview(
+                toolbarState: ActionToolbarState(
+                    tutorPlaybackState: .pausedOrFinished,
+                    localRecordingDraftState: .stopped,
+                    latestAttemptReviewState: .info,
+                    hasAttemptHistory: true
+                ),
+                title: "Send Ready Draft"
+            )
+            preview(
+                toolbarState: ActionToolbarState(
+                    tutorPlaybackState: .pausedOrFinished,
+                    localRecordingDraftState: nil,
+                    latestAttemptReviewState: .loading,
+                    hasAttemptHistory: true
+                ),
+                title: "Reviewing"
+            )
+            preview(
+                toolbarState: ActionToolbarState(
+                    tutorPlaybackState: .pausedOrFinished,
+                    localRecordingDraftState: nil,
+                    latestAttemptReviewState: .info,
+                    hasAttemptHistory: true
+                ),
+                title: "Reviewed Info"
+            )
         }
         .padding()
         .previewLayout(.sizeThatFits)
     }
 
     private static func preview(
-        for state: ActionToolbarState,
-        recordingState: RecordingInputToolbarState,
+        toolbarState: ActionToolbarState,
         title: String
     ) -> some View {
         ActionStackView(
-            toolbarState: state,
-            reviewStatusState: state.reviewState,
-            recordingToolbarState: recordingState,
+            toolbarState: toolbarState,
             onPlaybackTapped: {},
             onRecordTapped: {},
             onStopRecordingTapped: {},

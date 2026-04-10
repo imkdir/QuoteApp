@@ -64,8 +64,6 @@ struct MainScreen: View {
 
             ActionStackView(
                 toolbarState: viewModel.actionToolbarState,
-                reviewStatusState: viewModel.reviewStatusState,
-                recordingToolbarState: viewModel.recordingToolbarState,
                 onPlaybackTapped: viewModel.playbackTapped,
                 onRecordTapped: viewModel.recordTapped,
                 onStopRecordingTapped: viewModel.stopRecordingTapped,
@@ -86,23 +84,29 @@ struct MainScreen: View {
 struct MainScreen_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            MainScreen(viewModel: .previewReviewedInfoClosed)
-                .previewDisplayName("Reviewed Info (Sheet Closed)")
+            MainScreen(viewModel: .previewSpeakingNoAttempts)
+                .previewDisplayName("Speaking (No Attempts)")
+
+            MainScreen(viewModel: .previewSpeakingWithOlderHistory)
+                .previewDisplayName("Speaking (With History)")
+
+            MainScreen(viewModel: .previewLoadingLatestAttempt)
+                .previewDisplayName("Latest Attempt Loading")
+
+            MainScreen(viewModel: .previewReviewedInfoLatestAttempt)
+                .previewDisplayName("Latest Attempt Reviewed Info")
 
             MainScreen(viewModel: .previewReviewedInfoPresented)
-                .previewDisplayName("Reviewed Info (Sheet Presented)")
+                .previewDisplayName("Latest Info (Sheet Presented)")
 
-            MainScreen(viewModel: .previewReviewedPerfect)
-                .previewDisplayName("Reviewed Perfect")
+            MainScreen(viewModel: .previewReviewedPerfectLatestAttempt)
+                .previewDisplayName("Latest Attempt Reviewed Perfect")
 
-            MainScreen(viewModel: .previewUnavailable)
-                .previewDisplayName("Unavailable")
+            MainScreen(viewModel: .previewUnavailableLatestAttempt)
+                .previewDisplayName("Latest Attempt Unavailable")
 
-            MainScreen(viewModel: .previewLoading)
-                .previewDisplayName("Loading")
-
-            MainScreen(viewModel: .previewSendReadyWithOlderReviewedInfo)
-                .previewDisplayName("Send Ready + Older Reviewed Info")
+            MainScreen(viewModel: .previewSendReadyWithOlderReviewedAttempt)
+                .previewDisplayName("Send Ready + Older Reviewed Attempt")
         }
     }
 }

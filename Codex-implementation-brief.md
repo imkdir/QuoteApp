@@ -70,6 +70,34 @@ Implementation note:
 * Do not split quote rendering into multiple overlapping quote layers.
 * Do not add metadata or extra quote-surface controls in the MVP.
 
+### Attempt history model
+
+A practice session may contain a history of learner attempts.
+
+For MVP, each attempt can be modeled as a pair of:
+
+* a learner recording
+* an optional tutor review result
+
+A tutor review result may be simplified to:
+
+* optional marked words
+* optional short feedback text
+* one of the internal analysis states:
+
+  * `loading`
+  * `info`
+  * `perfect`
+  * `unavailable`
+
+The UI should display the latest attempt’s review state.
+
+When the learner sends a new recording:
+
+* create a new current attempt
+* show `Reviewing` while that attempt is being processed
+* once review finishes, replace the visible review with the latest attempt’s result
+
 ### Feedback details
 
 * The main review surface is the quote itself.
@@ -160,75 +188,87 @@ Keep the styling flat and system-like.
 
 ### Action visibility rule
 
-The action stack is state-driven and should not show all control groups at the same time.
+The action stack is state-driven, but it should feel natural rather than rigid.
 
-Only one action mode should be visible at a time:
+Important distinction:
 
-- **playback mode**
-  - used when the tutor is speaking, paused, or finished
-  - may show `Pause` or `Repeat`
+* the **current tutor playback state** controls playback controls
+* the **current local recording draft** controls recording/send-ready controls
+* the **latest attempt review state** controls review controls
 
-- **recording mode**
-  - used when the learner is actively recording
-  - only recording controls should be visible
+These are separate concerns and should not be flattened into one mutually exclusive enum.
 
-- **send-ready mode**
-  - used when a learner recording exists locally but has not been sent yet
-  - only the recording toolbar and `Send` action should be visible
+Natural toolbar behavior:
 
-- **review mode**
-  - used when the app is reviewing or has already produced a review result
-  - may show `Reviewing`, `Reviewed`, or `Unavailable`
+* when the learner is **recording** or has a **stopped-but-unsent local draft**, show only recording-related controls in the toolbar
+* when the learner is **not recording** and has no unsent local draft, playback controls should be available based on tutor playback state
+* when nothing blocks review controls, show review controls whenever:
 
-Exclusivity rule:
-- while a learner recording is active, hide playback and review controls
-- while a stopped learner recording is still present and ready to send, hide playback and review controls
-- playback and review controls may reappear only when there is no active or preserved learner recording in the toolbar
+  * analysis for the latest attempt is loading, or
+  * there is at least one attempt in session history
+
+In other words:
+
+* **recording/send-ready** has toolbar exclusivity
+* **playback** should be available whenever the learner is not in recording/send-ready mode
+* **review** should be available whenever there is an in-progress or completed latest attempt and recording/send-ready mode is not active
+
+The screen may still display the latest completed review in the quote area or review sheet, because review belongs to session history, not only to the current local draft.
 
 ### Playback action
-- show `Pause` while tutor audio is actively playing
-- show `Repeat` when tutor audio is paused or finished
-- use `pause.circle.fill` and `play.circle.fill`
-- hide playback controls whenever the recording toolbar is active or a local recording is present
+
+* show `Pause` while tutor audio is actively playing
+* show `Repeat` when tutor audio is paused or finished
+* use `pause.circle.fill` and `play.circle.fill`
+* playback controls should be available whenever the learner is not in recording/send-ready mode
 
 ### Recording action
+
 Default state:
-- show a `Record` action in the right toolbar using `waveform.circle.fill`
+
+* show a `Record` action in the right toolbar using `waveform.circle.fill`
 
 When record is pressed:
-- the record button disappears from the right toolbar
-- a standalone `RecordingInputToolbar` component appears on the left side
-- `RecordingInputToolbar` owns its own visual states and interaction states
-- the recording input uses a glass-style toolbar background
-- the recording input contains a live waveform view
-- the recording input shows a stop action at the right edge using `stop.circle.fill`
+
+* the record button disappears from the right toolbar
+* a standalone `RecordingInputToolbar` component appears on the left side
+* `RecordingInputToolbar` owns its own visual states and interaction states
+* the recording input uses a glass-style toolbar background
+* the recording input contains a live waveform view
+* the recording input shows a stop action at the right edge using `stop.circle.fill`
 
 When stop is pressed:
-- `RecordingInputToolbar` stays visible
-- it switches to a stopped-recording state internally
-- it shows a close action at the right edge using `xmark.circle.fill`
-- pressing close resets the recording input back to its default hidden/inactive state
-- the right toolbar shows `Send` using `arrow.up.circle.fill`
-- the `Send` action should be visually tinted blue and feel like the primary next action
+
+* `RecordingInputToolbar` stays visible
+* it switches to a stopped-recording state internally
+* it shows a close action at the right edge using `xmark.circle.fill`
+* pressing close resets the recording input back to its default hidden/inactive state
+* the right toolbar shows `Send` using `arrow.up.circle.fill`
+* the `Send` action should be visually tinted blue and feel like the primary next action
 
 While the recording toolbar is visible:
-- hide playback controls
-- hide review controls
+
+* hide playback controls
+* hide review controls in the toolbar
 
 ### Analysis action
+
 Show a compact `Review` action or status control with one of:
-- `Reviewing` using `arrow.down.message.fill`
-- `Reviewed` using:
-  - `checkmark.message.fill` when the result is effectively perfect
-  - `ellipsis.message.fill` when the result contains marks / info
-- `Unavailable` using `exclamationmark.message.fill`
+
+* `Reviewing` using `arrow.down.message.fill`
+* `Reviewed` using:
+
+  * `checkmark.message.fill` when the result is effectively perfect
+  * `ellipsis.message.fill` when the result contains marks / info
+* `Unavailable` using `exclamationmark.message.fill`
 
 Behavior:
-- `Reviewing` is not tappable
-- `Reviewed` is tappable and opens review details if needed
-- `Unavailable` is tappable and explains that review could not be completed via a simple bottom sheet
-- `Reviewed` visually covers both internal `info` and `perfect`, while the app state still distinguishes them
-- hide review controls whenever the recording toolbar is active or a local recording is present
+
+* `Reviewing` is not tappable
+* `Reviewed` is tappable and opens review details if needed
+* `Unavailable` is tappable and explains that review could not be completed via a simple bottom sheet
+* `Reviewed` visually covers both internal `info` and `perfect`, while the app state still distinguishes them
+* show review controls whenever recording/send-ready mode is not active and the latest attempt is either loading or already exists in session history
 
 ---
 
@@ -245,7 +285,7 @@ Behavior:
 ### Nice to have
 
 1. Current-word subtle highlight during tutor playback
-2. Brief positive animation when a previously marked word is corrected on retry
+2. Brief positive animation when a previously marked word is corrected on a later attempt
 3. Soft status transitions between reviewing / reviewed / unavailable
 
 Keep animations restrained and purposeful.
@@ -267,7 +307,8 @@ Recommended approach:
 * `MainViewModel` owns screen behavior and state transitions
 * LiveKit and audio concerns are isolated behind managers/services
 * backend-facing repositories/services stay separate from UI state logic
-* action toolbar state should be modeled explicitly instead of inferred ad hoc inside views
+* toolbar rendering should be derived from separate playback state, local recording draft state, and latest-attempt review state instead of flattened into one enum
+* current local recording draft state should be kept separate from attempt-history review state
 
 ### Suggested frontend architecture
 
@@ -301,6 +342,7 @@ Implement models for:
 * `RecordingState`
 * `AnalysisState`
 * `ActionToolbarState`
+* a lightweight attempt-history model
 
 ### Frontend task 3 — Main screen and state model
 
@@ -348,6 +390,7 @@ Implement:
 
 * review status UI for internal `info` / `perfect` / `unavailable`
 * optional bottom sheet for secondary feedback if needed
+* latest-attempt review display based on attempt history
 
 ### Frontend task 8 — Audio + playback sync
 
@@ -373,7 +416,7 @@ Wire screen to:
 
 * quotes endpoint
 * session start endpoint
-* analysis result polling / retry
+* analysis result polling
 * result mapping to UI states
 
 ---

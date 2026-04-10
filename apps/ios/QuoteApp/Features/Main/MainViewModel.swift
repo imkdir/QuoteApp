@@ -7,10 +7,10 @@ final class MainViewModel: ObservableObject {
     @Published var practiceStatusMessage: String
     @Published var spokenTokenCount: Int
     @Published var feedbackSheetAnalysis: PracticeAnalysis?
+    @Published var tutorPlaybackState: TutorPlaybackState
 
     let quotes: [Quote]
 
-    private var isTutorSpeaking: Bool
     private var nextMockResultCursor: Int
     private let mockResultOrder: [AnalysisState] = [.info, .perfect, .unavailable]
     private var pendingMockOutcomes: [UUID: AnalysisState]
@@ -21,7 +21,7 @@ final class MainViewModel: ObservableObject {
         isQuotePickerPresented: Bool = false,
         spokenTokenCount: Int = 0,
         feedbackSheetAnalysis: PracticeAnalysis? = nil,
-        isTutorSpeaking: Bool = false,
+        tutorPlaybackState: TutorPlaybackState = .pausedOrFinished,
         nextMockResultCursor: Int = 0,
         pendingMockOutcomes: [UUID: AnalysisState] = [:]
     ) {
@@ -31,66 +31,41 @@ final class MainViewModel: ObservableObject {
         self.practiceStatusMessage = "Tap Repeat to advance spoken words."
         self.spokenTokenCount = spokenTokenCount
         self.feedbackSheetAnalysis = feedbackSheetAnalysis
-        self.isTutorSpeaking = isTutorSpeaking
+        self.tutorPlaybackState = tutorPlaybackState
         self.nextMockResultCursor = nextMockResultCursor
         self.pendingMockOutcomes = pendingMockOutcomes
     }
 
     var actionToolbarState: ActionToolbarState {
         guard let session = sessionState.practiceSession else {
-            return .default
+            return ActionToolbarState(
+                tutorPlaybackState: tutorPlaybackState,
+                localRecordingDraftState: nil,
+                latestAttemptReviewState: .none,
+                hasAttemptHistory: false
+            )
         }
 
-        if let localDraft = session.localRecordingDraft {
-            switch localDraft.state {
-            case .recording:
-                return .recording
-            case .stopped:
-                return .recordedReadyToSend
-            }
-        }
-
-        if let latestAnalysis = session.latestAnalysis {
-            switch latestAnalysis.state {
-            case .loading:
-                return .reviewing
-            case .info:
-                return .reviewedInfo
-            case .perfect:
-                return .reviewedPerfect
-            case .unavailable:
-                return .unavailable
-            }
-        }
-
-        return isTutorSpeaking ? .speaking : .pausedOrFinished
+        return ActionToolbarState(
+            tutorPlaybackState: tutorPlaybackState,
+            localRecordingDraftState: session.localRecordingDraft?.state,
+            latestAttemptReviewState: latestAttemptReviewState,
+            hasAttemptHistory: !session.attempts.isEmpty
+        )
     }
 
-    var recordingToolbarState: RecordingInputToolbarState {
-        guard let localDraft = sessionState.practiceSession?.localRecordingDraft else {
-            return .recording
+    var latestAttemptReviewState: LatestAttemptReviewState {
+        guard let latestAnalysis = latestAnalysis else {
+            return .none
         }
 
-        switch localDraft.state {
-        case .recording:
-            return .recording
-        case .stopped:
-            return .stopped
-        }
-    }
-
-    var reviewStatusState: ReviewStatusButton.State {
-        guard let state = sessionState.practiceSession?.latestAnalysis?.state else {
-            return .review
-        }
-
-        switch state {
+        switch latestAnalysis.state {
         case .loading:
-            return .reviewing
+            return .loading
         case .info:
-            return .reviewedInfo
+            return .info
         case .perfect:
-            return .reviewedPerfect
+            return .perfect
         case .unavailable:
             return .unavailable
         }
@@ -129,7 +104,7 @@ final class MainViewModel: ObservableObject {
         sessionState = .practice(PracticeSession(quote: quote))
         isQuotePickerPresented = false
         spokenTokenCount = 0
-        isTutorSpeaking = false
+        tutorPlaybackState = .pausedOrFinished
         feedbackSheetAnalysis = nil
         practiceStatusMessage = "All words are dimmed. Tap Repeat to mock playback."
     }
@@ -143,13 +118,13 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        if isTutorSpeaking {
-            isTutorSpeaking = false
+        if tutorPlaybackState == .speaking {
+            tutorPlaybackState = .pausedOrFinished
             practiceStatusMessage = "Playback paused (mock)."
             return
         }
 
-        isTutorSpeaking = true
+        tutorPlaybackState = .speaking
         advanceSpokenProgress()
     }
 
@@ -168,7 +143,7 @@ final class MainViewModel: ObservableObject {
         }
 
         feedbackSheetAnalysis = nil
-        isTutorSpeaking = false
+        tutorPlaybackState = .pausedOrFinished
         practiceStatusMessage = "Recording started (mock)."
     }
 
@@ -273,7 +248,7 @@ final class MainViewModel: ObservableObject {
         spokenTokenCount = min(spokenTokenCount + 3, selectedQuote.wordCount)
 
         if spokenTokenCount >= selectedQuote.wordCount {
-            isTutorSpeaking = false
+            tutorPlaybackState = .pausedOrFinished
             practiceStatusMessage = "Playback finished (mock)."
         } else {
             practiceStatusMessage = "Tutor speaking mock advanced to word \(spokenTokenCount)."
@@ -360,28 +335,47 @@ extension MainViewModel {
         MainViewModel()
     }
 
-    static var previewReviewedInfoClosed: MainViewModel {
-        makeReviewPreview(state: .info, presentSheet: false)
+    static var previewSpeakingNoAttempts: MainViewModel {
+        let viewModel = MainViewModel()
+        guard let quote = viewModel.quotes.first else {
+            return viewModel
+        }
+
+        viewModel.sessionState = .practice(PracticeSession(quote: quote))
+        viewModel.tutorPlaybackState = .speaking
+        viewModel.practiceStatusMessage = "Tutor speaking mock is active."
+        return viewModel
+    }
+
+    static var previewSpeakingWithOlderHistory: MainViewModel {
+        let viewModel = makeLatestReviewPreview(state: .info, presentSheet: false)
+        viewModel.tutorPlaybackState = .speaking
+        viewModel.practiceStatusMessage = "Speaking while older attempt history exists."
+        return viewModel
+    }
+
+    static var previewLoadingLatestAttempt: MainViewModel {
+        makeLatestReviewPreview(state: .loading, presentSheet: false)
+    }
+
+    static var previewReviewedInfoLatestAttempt: MainViewModel {
+        makeLatestReviewPreview(state: .info, presentSheet: false)
     }
 
     static var previewReviewedInfoPresented: MainViewModel {
-        makeReviewPreview(state: .info, presentSheet: true)
+        makeLatestReviewPreview(state: .info, presentSheet: true)
     }
 
-    static var previewReviewedPerfect: MainViewModel {
-        makeReviewPreview(state: .perfect, presentSheet: false)
+    static var previewReviewedPerfectLatestAttempt: MainViewModel {
+        makeLatestReviewPreview(state: .perfect, presentSheet: false)
     }
 
-    static var previewUnavailable: MainViewModel {
-        makeReviewPreview(state: .unavailable, presentSheet: false)
+    static var previewUnavailableLatestAttempt: MainViewModel {
+        makeLatestReviewPreview(state: .unavailable, presentSheet: false)
     }
 
-    static var previewLoading: MainViewModel {
-        makeReviewPreview(state: .loading, presentSheet: false)
-    }
-
-    static var previewSendReadyWithOlderReviewedInfo: MainViewModel {
-        let viewModel = makeReviewPreview(state: .info, presentSheet: false)
+    static var previewSendReadyWithOlderReviewedAttempt: MainViewModel {
+        let viewModel = makeLatestReviewPreview(state: .info, presentSheet: false)
         viewModel.updatePracticeSession { session in
             session.localRecordingDraft = LocalRecordingDraft(
                 recordingReference: "local-draft-preview",
@@ -392,7 +386,7 @@ extension MainViewModel {
         return viewModel
     }
 
-    private static func makeReviewPreview(state: AnalysisState, presentSheet: Bool) -> MainViewModel {
+    private static func makeLatestReviewPreview(state: AnalysisState, presentSheet: Bool) -> MainViewModel {
         let viewModel = MainViewModel()
         guard let quote = viewModel.quotes.first else {
             return viewModel
@@ -409,6 +403,7 @@ extension MainViewModel {
             )
         )
 
+        viewModel.tutorPlaybackState = .pausedOrFinished
         viewModel.practiceStatusMessage = previewStatusMessage(for: state)
 
         if presentSheet {

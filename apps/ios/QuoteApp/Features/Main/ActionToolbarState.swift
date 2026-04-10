@@ -1,70 +1,82 @@
 import Foundation
 
-enum ActionToolbarState: Equatable {
-    case `default`
+enum TutorPlaybackState: Equatable {
     case speaking
     case pausedOrFinished
-    case recording
-    case recordedReadyToSend
-    case reviewing
-    case reviewedInfo
-    case reviewedPerfect
+}
+
+enum LatestAttemptReviewState: Equatable {
+    case none
+    case loading
+    case info
+    case perfect
     case unavailable
+}
+
+struct ActionToolbarState: Equatable {
+    let tutorPlaybackState: TutorPlaybackState
+    let localRecordingDraftState: LocalRecordingDraftState?
+    let latestAttemptReviewState: LatestAttemptReviewState
+    let hasAttemptHistory: Bool
 
     var playbackMode: PlaybackActionButton.Mode? {
-        switch self {
+        guard localRecordingDraftState == nil else {
+            return nil
+        }
+
+        switch tutorPlaybackState {
         case .speaking:
             return .pause
-        case .default, .pausedOrFinished, .reviewedInfo, .reviewedPerfect, .unavailable:
+        case .pausedOrFinished:
             return .repeat
-        case .recording, .recordedReadyToSend, .reviewing:
-            return nil
         }
     }
 
-    var reviewState: ReviewStatusButton.State {
-        switch self {
-        case .reviewing:
+    var reviewState: ReviewStatusButton.State? {
+        guard localRecordingDraftState == nil else {
+            return nil
+        }
+
+        guard hasAttemptHistory || latestAttemptReviewState == .loading else {
+            return nil
+        }
+
+        switch latestAttemptReviewState {
+        case .none:
+            return .review
+        case .loading:
             return .reviewing
-        case .reviewedInfo:
+        case .info:
             return .reviewedInfo
-        case .reviewedPerfect:
+        case .perfect:
             return .reviewedPerfect
         case .unavailable:
             return .unavailable
-        default:
-            return .review
-        }
-    }
-
-    var showsReviewButton: Bool {
-        switch self {
-        case .recording, .recordedReadyToSend:
-            return false
-        default:
-            return true
         }
     }
 
     var showsRecordingToolbar: Bool {
-        switch self {
-        case .recording, .recordedReadyToSend:
-            return true
-        default:
-            return false
-        }
+        localRecordingDraftState != nil
     }
 
     var showsRecordButton: Bool {
-        switch self {
-        case .recording, .recordedReadyToSend, .reviewing, .speaking:
-            return false
-        default:
-            return true
-        }
+        localRecordingDraftState == nil
+    }
+
+    var showsReviewButton: Bool {
+        reviewState != nil
     }
 
     var showsSendButton: Bool {
-        self == .recordedReadyToSend
+        localRecordingDraftState == .stopped
+    }
+
+    var recordingToolbarState: RecordingInputToolbarState {
+        switch localRecordingDraftState {
+        case .stopped:
+            return .stopped
+        default:
+            return .recording
+        }
     }
 }
