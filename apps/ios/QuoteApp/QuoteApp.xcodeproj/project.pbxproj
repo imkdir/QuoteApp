@@ -26,6 +26,7 @@
 		6E0F564513962A3495EE2394 /* TutorFeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4367D9459F1D9358BA542A3 /* TutorFeedbackSheet.swift */; };
 		70D12F2E1E121DA4CA3130CE /* LiveKitTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A05B59FFD2DFCC5089EFBA9C /* LiveKitTokenProvider.swift */; };
 		769A7DB2489766B427B485FE /* QuoteListItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC094CC1B49F4B162C7E0227 /* QuoteListItemView.swift */; };
+		78D832E2616E832951238149 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = 06D87B830779ACB60E3D6660 /* LiveKit */; };
 		7919275E1CBB9DFA408B22A0 /* UserRecordingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B822AFE52F53F3DBBA85B3C /* UserRecordingManager.swift */; };
 		806072C09A59D9E510DA37A6 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BDE761778A793715FD65AE9 /* RootView.swift */; };
 		8994A7EB2BC30B8505EB6060 /* QuoteRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4DCCC77A4D3A0AC74650A7 /* QuoteRepository.swift */; };
@@ -88,6 +89,17 @@
 		E4AC2D1C18A422778B43D461 /* PlaybackTimingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackTimingCoordinator.swift; sourceTree = "<group>"; };
 		E4E90D1CC5ED2DB064DB24BF /* Quote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Quote.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		E3BE305185D9B5F364865B58 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				78D832E2616E832951238149 /* LiveKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		00565CB18CB4F377CC76A8A5 /* Domain */ = {
@@ -279,6 +291,7 @@
 			buildConfigurationList = 7469ACCAA340714B599ACE68 /* Build configuration list for PBXNativeTarget "QuoteApp" */;
 			buildPhases = (
 				2A6507BAAB6F3BE4B56EE6EC /* Sources */,
+				E3BE305185D9B5F364865B58 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -286,6 +299,7 @@
 			);
 			name = QuoteApp;
 			packageProductDependencies = (
+				06D87B830779ACB60E3D6660 /* LiveKit */,
 			);
 			productName = QuoteApp;
 			productReference = CBDDD2296983E1EF93CB4A54 /* QuoteApp.app */;
@@ -315,6 +329,9 @@
 			);
 			mainGroup = 05C34A80E2706DDA7A1F8029;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				81B93A895B3C843B9A7D3635 /* XCRemoteSwiftPackageReference "client-sdk-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 48BA63277649980E71F6E33F /* Products */;
 			projectDirPath = "";
@@ -559,6 +576,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		81B93A895B3C843B9A7D3635 /* XCRemoteSwiftPackageReference "client-sdk-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/livekit/client-sdk-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		06D87B830779ACB60E3D6660 /* LiveKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 81B93A895B3C843B9A7D3635 /* XCRemoteSwiftPackageReference "client-sdk-swift" */;
+			productName = LiveKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D32DD8D8B033D305E062BCD7 /* Project object */;
 }

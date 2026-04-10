@@ -4,6 +4,10 @@ options:
 settings:
   base:
     SWIFT_VERSION: 5.0
+packages:
+  LiveKit:
+    url: https://github.com/livekit/client-sdk-swift.git
+    from: 2.0.0
 targets:
   QuoteApp:
     type: application
@@ -18,6 +22,9 @@ targets:
       - path: LiveKit
       - path: Theme
       - path: PreviewSupport
+    dependencies:
+      - package: LiveKit
+        product: LiveKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.quoteapp.app

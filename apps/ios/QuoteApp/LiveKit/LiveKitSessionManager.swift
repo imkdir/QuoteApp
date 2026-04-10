@@ -55,7 +55,7 @@ final class LiveKitSessionManager: ObservableObject {
 
 #if canImport(LiveKit)
             if room.connectionState != .disconnected {
-                room.disconnect()
+                await room.disconnect()
             }
 
             try await room.connect(
@@ -79,9 +79,9 @@ final class LiveKitSessionManager: ObservableObject {
         }
     }
 
-    func disconnect() {
+    func disconnect() async {
 #if canImport(LiveKit)
-        room.disconnect()
+        await room.disconnect()
 #endif
         connectionState = .disconnected
     }
