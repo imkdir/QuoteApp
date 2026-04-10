@@ -14,6 +14,7 @@ class PracticeAttempt(BaseModel):
     attempt_id: str
     recording_reference: str
     review_result: Optional[TutorReviewResult] = None
+    is_superseded: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

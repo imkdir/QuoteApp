@@ -59,3 +59,19 @@ def get_practice_session(session_id: str) -> PracticeSession:
         raise SessionNotFoundError(f"Session not found: {session_id}")
 
     return session
+
+
+def mark_attempt_superseded(*, session_id: str, attempt_id: str) -> None:
+    """Marks a loading attempt as superseded for client-facing selection rules."""
+
+    with _SESSIONS_LOCK:
+        session = _SESSIONS.get(session_id)
+        if session is None:
+            raise SessionNotFoundError(f"Session not found: {session_id}")
+
+        for attempt in session.attempts:
+            if attempt.attempt_id != attempt_id:
+                continue
+
+            attempt.is_superseded = True
+            return

@@ -30,6 +30,7 @@ final class MainViewModel: ObservableObject {
 
     private var sessionStartTask: Task<String, Error>?
     private var resultPollingTask: Task<Void, Never>?
+    private var activeLoadingAttemptID: UUID?
     private var nextMockResultCursor: Int
     private let mockResultOrder: [AnalysisState] = [.info, .perfect, .unavailable]
 
@@ -76,7 +77,7 @@ final class MainViewModel: ObservableObject {
             tutorPlaybackState: tutorPlaybackState,
             localRecordingDraftState: session.localRecordingDraft?.state,
             latestAttemptReviewState: latestAttemptReviewState,
-            hasAttemptHistory: session.hasAttemptHistory
+            hasAttemptHistory: latestAnalysis != nil
         )
     }
 
@@ -98,7 +99,27 @@ final class MainViewModel: ObservableObject {
     }
 
     var latestAnalysis: PracticeAnalysis? {
-        sessionState.practiceSession?.latestAnalysis
+        latestVisibleReviewAttempt?.analysis
+    }
+
+    private var latestVisibleReviewAttempt: PracticeAttempt? {
+        guard let attempts = sessionState.practiceSession?.attempts else {
+            return nil
+        }
+
+        return attempts.reversed().first { attempt in
+            guard !attempt.isSupersededForUI,
+                  let analysis = attempt.analysis else {
+                return false
+            }
+
+            switch analysis.state {
+            case .loading:
+                return attempt.id == activeLoadingAttemptID
+            case .info, .perfect, .unavailable:
+                return true
+            }
+        }
     }
 
     var currentQuoteTokens: [QuoteToken] {
@@ -136,6 +157,7 @@ final class MainViewModel: ObservableObject {
         sessionStartTask = nil
         resultPollingTask?.cancel()
         resultPollingTask = nil
+        activeLoadingAttemptID = nil
 
         sessionState = .practice(PracticeSession(quote: quote))
         isQuotePickerPresented = false
@@ -235,6 +257,8 @@ final class MainViewModel: ObservableObject {
             return
         }
 
+        supersedeActiveLoadingAttemptForUI()
+
         let reference = "local-draft-\(Int(Date().timeIntervalSince1970))"
 
         updatePracticeSession { session in
@@ -275,7 +299,11 @@ final class MainViewModel: ObservableObject {
             session.localRecordingDraft = nil
         }
 
-        practiceStatusMessage = "Recording dismissed. Back to default controls."
+        if let latestAnalysis {
+            practiceStatusMessage = statusMessage(for: latestAnalysis.state)
+        } else {
+            practiceStatusMessage = "Recording dismissed. Back to default controls."
+        }
     }
 
     func sendTapped() {
@@ -302,6 +330,7 @@ final class MainViewModel: ObservableObject {
             session.localRecordingDraft = nil
             session.attempts.append(newAttempt)
         }
+        activeLoadingAttemptID = attemptID
 
         practiceStatusMessage = "Reviewing latest attempt."
         feedbackSheetAnalysis = nil
@@ -330,6 +359,11 @@ final class MainViewModel: ObservableObject {
                 self.applyBackendResult(latestResult, toLocalAttemptID: attemptID)
             } catch is CancellationError {
                 return
+            } catch AnalysisPollingService.PollingError.timedOut {
+                self.applyUnavailableResult(
+                    toLocalAttemptID: attemptID,
+                    message: "Review timed out for this attempt."
+                )
             } catch {
                 self.applyUnavailableResult(
                     toLocalAttemptID: attemptID,
@@ -395,9 +429,14 @@ final class MainViewModel: ObservableObject {
                 return
             }
 
+            guard !self.isAttemptSupersededForUI(attemptID) else {
+                return
+            }
+
             let analysis = self.mockAnalysis(for: quote, state: outcome)
             self.updateAnalysis(analysis, forAttemptID: attemptID, backendAttemptID: nil)
             self.practiceStatusMessage = self.statusMessage(for: outcome)
+            self.activeLoadingAttemptID = nil
         }
     }
 
@@ -446,6 +485,10 @@ final class MainViewModel: ObservableObject {
         _ latestResult: PracticeLatestResult,
         toLocalAttemptID attemptID: UUID
     ) {
+        guard !isAttemptSupersededForUI(attemptID) else {
+            return
+        }
+
         updatePracticeSession { session in
             if session.backendSessionID == nil {
                 session.backendSessionID = latestResult.sessionID
@@ -459,6 +502,9 @@ final class MainViewModel: ObservableObject {
             session.attempts[index].analysis = latestResult.analysis
         }
 
+        if latestResult.analysis.state != .loading {
+            activeLoadingAttemptID = nil
+        }
         practiceStatusMessage = statusMessage(for: latestResult.analysis.state)
     }
 
@@ -466,11 +512,16 @@ final class MainViewModel: ObservableObject {
         toLocalAttemptID attemptID: UUID,
         message: String
     ) {
+        guard !isAttemptSupersededForUI(attemptID) else {
+            return
+        }
+
         let unavailable = PracticeAnalysis(
             state: .unavailable,
             feedbackText: message
         )
         updateAnalysis(unavailable, forAttemptID: attemptID, backendAttemptID: nil)
+        activeLoadingAttemptID = nil
         practiceStatusMessage = "Review unavailable."
     }
 
@@ -489,6 +540,34 @@ final class MainViewModel: ObservableObject {
                 session.attempts[index].backendAttemptID = backendAttemptID
             }
         }
+    }
+
+    private func supersedeActiveLoadingAttemptForUI() {
+        guard let activeLoadingAttemptID else {
+            return
+        }
+
+        resultPollingTask?.cancel()
+        resultPollingTask = nil
+
+        updatePracticeSession { session in
+            guard let index = session.attempts.firstIndex(where: { $0.id == activeLoadingAttemptID }) else {
+                return
+            }
+
+            if session.attempts[index].analysis?.state == .loading {
+                session.attempts[index].isSupersededForUI = true
+            }
+        }
+
+        self.activeLoadingAttemptID = nil
+    }
+
+    private func isAttemptSupersededForUI(_ attemptID: UUID) -> Bool {
+        sessionState.practiceSession?
+            .attempts
+            .first(where: { $0.id == attemptID })?
+            .isSupersededForUI ?? false
     }
 
     private func statusMessage(for state: AnalysisState) -> String {
@@ -630,6 +709,10 @@ extension MainViewModel {
 
         viewModel.tutorPlaybackState = .pausedOrFinished
         viewModel.practiceStatusMessage = previewStatusMessage(for: state)
+
+        if state == .loading {
+            viewModel.activeLoadingAttemptID = attempt.id
+        }
 
         if presentSheet {
             viewModel.feedbackSheetAnalysis = analysis

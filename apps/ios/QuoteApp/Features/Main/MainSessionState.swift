@@ -5,17 +5,20 @@ struct PracticeAttempt: Identifiable, Equatable {
     var backendAttemptID: String?
     let recordingReference: String
     var analysis: PracticeAnalysis?
+    var isSupersededForUI: Bool
 
     init(
         id: UUID = UUID(),
         backendAttemptID: String? = nil,
         recordingReference: String,
-        analysis: PracticeAnalysis? = nil
+        analysis: PracticeAnalysis? = nil,
+        isSupersededForUI: Bool = false
     ) {
         self.id = id
         self.backendAttemptID = backendAttemptID
         self.recordingReference = recordingReference
         self.analysis = analysis
+        self.isSupersededForUI = isSupersededForUI
     }
 }
 

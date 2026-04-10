@@ -1,5 +1,6 @@
 """Mock result helpers for mapping practice attempts into app-facing payloads."""
 
+from datetime import datetime, timedelta, timezone
 import re
 from typing import Optional
 
@@ -28,6 +29,7 @@ _MOCK_STATE_ORDER: list[AnalysisState] = [
     AnalysisState.perfect,
     AnalysisState.unavailable,
 ]
+_LOADING_TIMEOUT_SECONDS = 12
 
 
 def choose_mock_state_for_quote(quote_id: str) -> AnalysisState:
@@ -84,6 +86,17 @@ def build_latest_result_response(
         quote_text=session.quote_text,
     )
 
+    if latest_attempt.is_superseded and review_result.state == AnalysisState.loading:
+        review_result = _make_superseded_unavailable_result()
+        latest_attempt.review_result = review_result
+
+    if _is_loading_timed_out(
+        created_at=latest_attempt.created_at,
+        review_result=review_result,
+    ):
+        review_result = _make_timeout_unavailable_result()
+        latest_attempt.review_result = review_result
+
     if override_state is not None:
         review_result = build_mock_review_result(
             state=override_state,
@@ -98,6 +111,34 @@ def build_latest_result_response(
         state=review_result.state,
         marked_tokens=review_result.marked_tokens,
         feedback_text=review_result.feedback_text,
+    )
+
+
+def _is_loading_timed_out(*, created_at: datetime, review_result: TutorReviewResult) -> bool:
+    """Returns true when loading has exceeded the mock timeout window."""
+
+    if review_result.state != AnalysisState.loading:
+        return False
+
+    deadline = created_at + timedelta(seconds=_LOADING_TIMEOUT_SECONDS)
+    return datetime.now(timezone.utc) >= deadline
+
+
+def _make_timeout_unavailable_result() -> TutorReviewResult:
+    """Maps stale loading states into unavailable for client consumption."""
+
+    return TutorReviewResult(
+        state=AnalysisState.unavailable,
+        feedback_text="Review timed out before completion.",
+    )
+
+
+def _make_superseded_unavailable_result() -> TutorReviewResult:
+    """Maps superseded loading attempts into unavailable for consistency."""
+
+    return TutorReviewResult(
+        state=AnalysisState.unavailable,
+        feedback_text="Review was superseded by a newer local recording draft.",
     )
 
 
