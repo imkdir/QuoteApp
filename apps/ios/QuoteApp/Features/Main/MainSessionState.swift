@@ -2,11 +2,18 @@ import Foundation
 
 struct PracticeAttempt: Identifiable, Equatable {
     let id: UUID
+    var backendAttemptID: String?
     let recordingReference: String
     var analysis: PracticeAnalysis?
 
-    init(id: UUID = UUID(), recordingReference: String, analysis: PracticeAnalysis? = nil) {
+    init(
+        id: UUID = UUID(),
+        backendAttemptID: String? = nil,
+        recordingReference: String,
+        analysis: PracticeAnalysis? = nil
+    ) {
         self.id = id
+        self.backendAttemptID = backendAttemptID
         self.recordingReference = recordingReference
         self.analysis = analysis
     }
@@ -24,11 +31,18 @@ struct LocalRecordingDraft: Equatable {
 
 struct PracticeSession: Equatable {
     let quote: Quote
+    var backendSessionID: String?
     var attempts: [PracticeAttempt]
     var localRecordingDraft: LocalRecordingDraft?
 
-    init(quote: Quote, attempts: [PracticeAttempt] = [], localRecordingDraft: LocalRecordingDraft? = nil) {
+    init(
+        quote: Quote,
+        backendSessionID: String? = nil,
+        attempts: [PracticeAttempt] = [],
+        localRecordingDraft: LocalRecordingDraft? = nil
+    ) {
         self.quote = quote
+        self.backendSessionID = backendSessionID
         self.attempts = attempts
         self.localRecordingDraft = localRecordingDraft
     }

@@ -38,11 +38,13 @@
 		A78E0C8B3AA60DF698453ECC /* MainScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EB11FD416A81520FD7F9622 /* MainScreen.swift */; };
 		A95FFD933A192147AB5FA197 /* MainSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B98C1D1929240C149DB7ABA /* MainSessionState.swift */; };
 		B8010A054195B4FA2AD34F68 /* ReviewStatusButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = E103B99DD704F48BC7579C62 /* ReviewStatusButton.swift */; };
+		C1198E75EB29BE0F6ED2E9D7 /* PracticeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B571FDB007778AC684499F /* PracticeService.swift */; };
 		D4A30EA59D786DA5D2CF86A9 /* StartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39EAA8D86FE959FD98006578 /* StartView.swift */; };
 		D65A66077477775F9276ECED /* AudioSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509BE7F9AE9B6A91D3EEFCED /* AudioSessionManager.swift */; };
 		F466DF236AC5628F06C1218F /* MockQuotes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08BFAFFE3C583FD52AB1819D /* MockQuotes.swift */; };
 		F5F3E781168C949E16AF81ED /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D63016FB60A361E4497160 /* RecordingState.swift */; };
 		F8A3B9E96CA479D13FE57F5F /* AnalysisPollingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CD945E4C33759367468191 /* AnalysisPollingService.swift */; };
+		FE1D6FDA544EB8FAE444EE03 /* PracticeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D33AC9730FD1BC00EF136A1 /* PracticeRepository.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +70,7 @@
 		957032671320A08B02D81657 /* ActionStackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionStackView.swift; sourceTree = "<group>"; };
 		98ADA70B37422F26AFB012A4 /* QuoteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteApp.swift; sourceTree = "<group>"; };
 		9C7D966D1CCC8E31A7EBAA82 /* PlaybackState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackState.swift; sourceTree = "<group>"; };
+		9D33AC9730FD1BC00EF136A1 /* PracticeRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeRepository.swift; sourceTree = "<group>"; };
 		9DF79F858FA03A8C253F036C /* AnalysisState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisState.swift; sourceTree = "<group>"; };
 		A05B59FFD2DFCC5089EFBA9C /* LiveKitTokenProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitTokenProvider.swift; sourceTree = "<group>"; };
 		A6777E4D7C91EE4B9B8A6946 /* MainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewModel.swift; sourceTree = "<group>"; };
@@ -78,6 +81,7 @@
 		CBDDD2296983E1EF93CB4A54 /* QuoteApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = QuoteApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF467E05B9B5899B1394069D /* QuoteToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteToken.swift; sourceTree = "<group>"; };
 		D3D63016FB60A361E4497160 /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
+		D6B571FDB007778AC684499F /* PracticeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeService.swift; sourceTree = "<group>"; };
 		DC094CC1B49F4B162C7E0227 /* QuoteListItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteListItemView.swift; sourceTree = "<group>"; };
 		E103B99DD704F48BC7579C62 /* ReviewStatusButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewStatusButton.swift; sourceTree = "<group>"; };
 		E4367D9459F1D9358BA542A3 /* TutorFeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorFeedbackSheet.swift; sourceTree = "<group>"; };
@@ -127,6 +131,7 @@
 		2EE2D3AA3500569945150BC2 /* Repositories */ = {
 			isa = PBXGroup;
 			children = (
+				9D33AC9730FD1BC00EF136A1 /* PracticeRepository.swift */,
 				8B4DCCC77A4D3A0AC74650A7 /* QuoteRepository.swift */,
 			);
 			path = Repositories;
@@ -204,6 +209,7 @@
 			isa = PBXGroup;
 			children = (
 				30CD945E4C33759367468191 /* AnalysisPollingService.swift */,
+				D6B571FDB007778AC684499F /* PracticeService.swift */,
 				73187205C69DF64DC2158CA7 /* QuoteService.swift */,
 			);
 			path = Services;
@@ -342,6 +348,8 @@
 				2162172E62963610C4B7F627 /* PlaybackState.swift in Sources */,
 				2BBC921E18D077DC2563848A /* PlaybackTimingCoordinator.swift in Sources */,
 				030F2468678F90D7E55C2900 /* PracticeAnalysis.swift in Sources */,
+				FE1D6FDA544EB8FAE444EE03 /* PracticeRepository.swift in Sources */,
+				C1198E75EB29BE0F6ED2E9D7 /* PracticeService.swift in Sources */,
 				166FE4D954F64FB2E95829A7 /* Quote.swift in Sources */,
 				5EADAA4A3C892E1A496B07F8 /* QuoteApp.swift in Sources */,
 				769A7DB2489766B427B485FE /* QuoteListItemView.swift in Sources */,

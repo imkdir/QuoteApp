@@ -3,6 +3,17 @@ import Foundation
 
 @MainActor
 final class MainViewModel: ObservableObject {
+    private enum PracticeFlowError: LocalizedError {
+        case repositoryUnavailable
+
+        var errorDescription: String? {
+            switch self {
+            case .repositoryUnavailable:
+                return "Practice repository is not configured."
+            }
+        }
+    }
+
     @Published var sessionState: MainSessionState
     @Published var isQuotePickerPresented: Bool
     @Published var practiceStatusMessage: String
@@ -14,14 +25,19 @@ final class MainViewModel: ObservableObject {
     @Published var quoteLoadingErrorMessage: String?
 
     private let quoteRepository: (any QuoteRepository)?
+    private let practiceRepository: (any PracticeRepository)?
+    private let analysisPollingService: AnalysisPollingService?
 
+    private var sessionStartTask: Task<String, Error>?
+    private var resultPollingTask: Task<Void, Never>?
     private var nextMockResultCursor: Int
     private let mockResultOrder: [AnalysisState] = [.info, .perfect, .unavailable]
-    private var pendingMockOutcomes: [UUID: AnalysisState]
 
     init(
         quotes: [Quote] = MockQuotes.all,
         quoteRepository: (any QuoteRepository)? = nil,
+        practiceRepository: (any PracticeRepository)? = nil,
+        analysisPollingService: AnalysisPollingService? = nil,
         sessionState: MainSessionState = .start,
         isQuotePickerPresented: Bool = false,
         spokenTokenCount: Int = 0,
@@ -29,11 +45,12 @@ final class MainViewModel: ObservableObject {
         tutorPlaybackState: TutorPlaybackState = .pausedOrFinished,
         isLoadingQuotes: Bool = false,
         quoteLoadingErrorMessage: String? = nil,
-        nextMockResultCursor: Int = 0,
-        pendingMockOutcomes: [UUID: AnalysisState] = [:]
+        nextMockResultCursor: Int = 0
     ) {
         self.quotes = quotes
         self.quoteRepository = quoteRepository
+        self.practiceRepository = practiceRepository
+        self.analysisPollingService = analysisPollingService
         self.sessionState = sessionState
         self.isQuotePickerPresented = isQuotePickerPresented
         self.practiceStatusMessage = "Tap Repeat to advance spoken words."
@@ -43,7 +60,6 @@ final class MainViewModel: ObservableObject {
         self.isLoadingQuotes = isLoadingQuotes
         self.quoteLoadingErrorMessage = quoteLoadingErrorMessage
         self.nextMockResultCursor = nextMockResultCursor
-        self.pendingMockOutcomes = pendingMockOutcomes
     }
 
     var actionToolbarState: ActionToolbarState {
@@ -116,12 +132,38 @@ final class MainViewModel: ObservableObject {
     }
 
     func selectQuote(_ quote: Quote) {
+        sessionStartTask?.cancel()
+        sessionStartTask = nil
+        resultPollingTask?.cancel()
+        resultPollingTask = nil
+
         sessionState = .practice(PracticeSession(quote: quote))
         isQuotePickerPresented = false
         spokenTokenCount = 0
         tutorPlaybackState = .pausedOrFinished
         feedbackSheetAnalysis = nil
         practiceStatusMessage = "All words are dimmed. Tap Repeat to mock playback."
+
+        guard practiceRepository != nil else {
+            return
+        }
+
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                _ = try await self.ensurePracticeSessionID(for: quote)
+            } catch is CancellationError {
+                return
+            } catch {
+                guard self.sessionState.selectedQuote?.id == quote.id else {
+                    return
+                }
+                self.practiceStatusMessage = "Could not start practice session. Review may be unavailable."
+            }
+        }
     }
 
     private func loadQuotesIfNeeded() {
@@ -261,15 +303,39 @@ final class MainViewModel: ObservableObject {
             session.attempts.append(newAttempt)
         }
 
-        let nextOutcome = mockResultOrder[nextMockResultCursor]
-        nextMockResultCursor = (nextMockResultCursor + 1) % mockResultOrder.count
-        pendingMockOutcomes[attemptID] = nextOutcome
-
-        practiceStatusMessage = "Reviewing latest attempt (mock)."
+        practiceStatusMessage = "Reviewing latest attempt."
         feedbackSheetAnalysis = nil
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-            self?.resolveMockAnalysis(for: attemptID)
+        resultPollingTask?.cancel()
+        resultPollingTask = nil
+
+        guard let selectedQuote = sessionState.selectedQuote,
+              let practiceRepository,
+              let analysisPollingService else {
+            resolveMockAnalysis(for: attemptID)
+            return
+        }
+
+        resultPollingTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let sessionID = try await self.ensurePracticeSessionID(for: selectedQuote)
+                let latestResult = try await analysisPollingService.pollLatestResult(
+                    sessionID: sessionID,
+                    repository: practiceRepository
+                )
+                self.applyBackendResult(latestResult, toLocalAttemptID: attemptID)
+            } catch is CancellationError {
+                return
+            } catch {
+                self.applyUnavailableResult(
+                    toLocalAttemptID: attemptID,
+                    message: "Review unavailable. Could not fetch latest attempt result."
+                )
+            }
         }
     }
 
@@ -317,36 +383,124 @@ final class MainViewModel: ObservableObject {
     }
 
     private func resolveMockAnalysis(for attemptID: UUID) {
-        guard let practiceSession = sessionState.practiceSession,
-              let attemptIndex = practiceSession.attempts.firstIndex(where: { $0.id == attemptID }) else {
-            pendingMockOutcomes[attemptID] = nil
+        guard let quote = sessionState.selectedQuote else {
             return
         }
 
-        guard let outcome = pendingMockOutcomes.removeValue(forKey: attemptID),
-              let quote = sessionState.selectedQuote else {
-            return
-        }
+        let outcome = mockResultOrder[nextMockResultCursor]
+        nextMockResultCursor = (nextMockResultCursor + 1) % mockResultOrder.count
 
-        let analysis = mockAnalysis(for: quote, state: outcome)
-
-        updatePracticeSession { session in
-            guard attemptIndex < session.attempts.count else {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            guard let self else {
                 return
             }
 
-            session.attempts[attemptIndex].analysis = analysis
+            let analysis = self.mockAnalysis(for: quote, state: outcome)
+            self.updateAnalysis(analysis, forAttemptID: attemptID, backendAttemptID: nil)
+            self.practiceStatusMessage = self.statusMessage(for: outcome)
+        }
+    }
+
+    private func ensurePracticeSessionID(for quote: Quote) async throws -> String {
+        if let existingSessionID = sessionState.practiceSession?.backendSessionID {
+            return existingSessionID
         }
 
-        switch outcome {
-        case .info:
-            practiceStatusMessage = "Reviewed (info): words marked on the quote."
-        case .perfect:
-            practiceStatusMessage = "Reviewed (perfect): no marked words."
-        case .unavailable:
-            practiceStatusMessage = "Review unavailable (mock)."
+        if let sessionStartTask {
+            return try await sessionStartTask.value
+        }
+
+        guard let practiceRepository else {
+            throw PracticeFlowError.repositoryUnavailable
+        }
+
+        let startTask = Task<String, Error> {
+            let start = try await practiceRepository.startSession(
+                quoteID: quote.id,
+                quoteText: quote.fullText
+            )
+            return start.sessionID
+        }
+        sessionStartTask = startTask
+
+        do {
+            let startedSessionID = try await startTask.value
+            sessionStartTask = nil
+
+            guard sessionState.selectedQuote?.id == quote.id else {
+                return startedSessionID
+            }
+
+            updatePracticeSession { session in
+                session.backendSessionID = startedSessionID
+            }
+
+            return startedSessionID
+        } catch {
+            sessionStartTask = nil
+            throw error
+        }
+    }
+
+    private func applyBackendResult(
+        _ latestResult: PracticeLatestResult,
+        toLocalAttemptID attemptID: UUID
+    ) {
+        updatePracticeSession { session in
+            if session.backendSessionID == nil {
+                session.backendSessionID = latestResult.sessionID
+            }
+
+            guard let index = session.attempts.firstIndex(where: { $0.id == attemptID }) else {
+                return
+            }
+
+            session.attempts[index].backendAttemptID = latestResult.attemptID
+            session.attempts[index].analysis = latestResult.analysis
+        }
+
+        practiceStatusMessage = statusMessage(for: latestResult.analysis.state)
+    }
+
+    private func applyUnavailableResult(
+        toLocalAttemptID attemptID: UUID,
+        message: String
+    ) {
+        let unavailable = PracticeAnalysis(
+            state: .unavailable,
+            feedbackText: message
+        )
+        updateAnalysis(unavailable, forAttemptID: attemptID, backendAttemptID: nil)
+        practiceStatusMessage = "Review unavailable."
+    }
+
+    private func updateAnalysis(
+        _ analysis: PracticeAnalysis,
+        forAttemptID attemptID: UUID,
+        backendAttemptID: String?
+    ) {
+        updatePracticeSession { session in
+            guard let index = session.attempts.firstIndex(where: { $0.id == attemptID }) else {
+                return
+            }
+
+            session.attempts[index].analysis = analysis
+            if let backendAttemptID {
+                session.attempts[index].backendAttemptID = backendAttemptID
+            }
+        }
+    }
+
+    private func statusMessage(for state: AnalysisState) -> String {
+        switch state {
         case .loading:
-            practiceStatusMessage = "Reviewing latest attempt (mock)."
+            return "Reviewing latest attempt."
+        case .info:
+            return "Reviewed (info): words marked on the quote."
+        case .perfect:
+            return "Reviewed (perfect): no marked words."
+        case .unavailable:
+            return "Review unavailable."
         }
     }
 
@@ -396,6 +550,8 @@ extension MainViewModel {
         MainViewModel(
             quotes: [],
             quoteRepository: environment.quoteRepository,
+            practiceRepository: environment.practiceRepository,
+            analysisPollingService: environment.analysisPollingService,
             quoteLoadingErrorMessage: nil
         )
     }

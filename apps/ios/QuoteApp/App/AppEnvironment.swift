@@ -3,6 +3,8 @@ import Foundation
 struct AppEnvironment {
     let backendBaseURL: URL
     let quoteRepository: any QuoteRepository
+    let practiceRepository: any PracticeRepository
+    let analysisPollingService: AnalysisPollingService
 
     static var runtime: AppEnvironment {
         let configuredURL =
@@ -17,7 +19,11 @@ struct AppEnvironment {
             backendBaseURL: backendBaseURL,
             quoteRepository: QuoteRepositoryImpl(
                 quoteService: QuoteService(baseURL: backendBaseURL)
-            )
+            ),
+            practiceRepository: PracticeRepositoryImpl(
+                practiceService: PracticeService(baseURL: backendBaseURL)
+            ),
+            analysisPollingService: AnalysisPollingService()
         )
     }
 }

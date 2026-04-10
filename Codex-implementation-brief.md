@@ -92,6 +92,27 @@ A tutor review result may be simplified to:
 
 The UI should display the latest attempt’s review state.
 
+### Superseded and timed-out loading
+
+A `loading` review state is only meaningful while the client is actively waiting for that attempt’s result.
+
+If the learner starts a new local recording before a pending review completes:
+- cancel client-side polling for the previous pending attempt
+- treat that pending attempt as superseded for UI purposes
+- do not continue showing its loading state as the active review
+
+If a local draft is later deleted:
+- restore the latest meaningful review state, if one exists
+- otherwise do not show a review control
+
+For UI purposes, a meaningful review is:
+- `info`
+- `perfect`
+- `unavailable`
+- `loading` only if it is the currently active review request
+
+A review request that remains `loading` beyond a reasonable timeout should transition to `unavailable`.
+
 When the learner sends a new recording:
 
 * create a new current attempt
@@ -188,39 +209,40 @@ Keep the styling flat and system-like.
 
 ### Action visibility rule
 
-The action stack is state-driven, but it should feel natural rather than rigid.
+The action stack is state-driven and should not show all control groups at the same time.
 
 Important distinction:
 
-* the **current tutor playback state** controls playback controls
-* the **current local recording draft** controls recording/send-ready controls
-* the **latest attempt review state** controls review controls
+* review UI is based on the latest completed or in-progress attempt in session history
+* a stale or superseded `loading` attempt should not count as the latest visible review for toolbar purposes.
+* recording/send-ready UI is based on the current local recording draft
 
-These are separate concerns and should not be flattened into one mutually exclusive enum.
+Only one action mode should be visible at a time:
 
-Natural toolbar behavior:
+* **playback mode**
+* **recording mode**
+* **send-ready mode**
+* **review mode**
 
-* when the learner is **recording** or has a **stopped-but-unsent local draft**, show only recording-related controls in the toolbar
-* when the learner is **not recording** and has no unsent local draft, playback controls should be available based on tutor playback state
-* when nothing blocks review controls, show review controls whenever:
+While a current local recording draft exists and has not been sent:
 
-  * analysis for the latest attempt is loading, or
-  * there is at least one attempt in session history
+* show recording-related controls in the toolbar
+* hide playback and review controls in the toolbar
 
-In other words:
+However, the screen may still display the latest completed review in the quote area or review sheet, because review belongs to session history, not only to the current draft state.
 
-* **recording/send-ready** has toolbar exclusivity
-* **playback** should be available whenever the learner is not in recording/send-ready mode
-* **review** should be available whenever there is an in-progress or completed latest attempt and recording/send-ready mode is not active
+After the current recording is sent:
 
-The screen may still display the latest completed review in the quote area or review sheet, because review belongs to session history, not only to the current local draft.
+* leave send-ready mode
+* enter reviewing mode
+* show the latest attempt’s review state (`loading`, `info`, `perfect`, or `unavailable`)
 
 ### Playback action
 
 * show `Pause` while tutor audio is actively playing
 * show `Repeat` when tutor audio is paused or finished
 * use `pause.circle.fill` and `play.circle.fill`
-* playback controls should be available whenever the learner is not in recording/send-ready mode
+* hide playback controls whenever the recording toolbar is active or a local recording draft is present
 
 ### Recording action
 
@@ -268,7 +290,7 @@ Behavior:
 * `Reviewed` is tappable and opens review details if needed
 * `Unavailable` is tappable and explains that review could not be completed via a simple bottom sheet
 * `Reviewed` visually covers both internal `info` and `perfect`, while the app state still distinguishes them
-* show review controls whenever recording/send-ready mode is not active and the latest attempt is either loading or already exists in session history
+* hide review controls whenever the recording toolbar is active or a local recording draft is present
 
 ---
 
@@ -307,7 +329,7 @@ Recommended approach:
 * `MainViewModel` owns screen behavior and state transitions
 * LiveKit and audio concerns are isolated behind managers/services
 * backend-facing repositories/services stay separate from UI state logic
-* toolbar rendering should be derived from separate playback state, local recording draft state, and latest-attempt review state instead of flattened into one enum
+* action toolbar state should be modeled explicitly instead of inferred ad hoc inside views
 * current local recording draft state should be kept separate from attempt-history review state
 
 ### Suggested frontend architecture
