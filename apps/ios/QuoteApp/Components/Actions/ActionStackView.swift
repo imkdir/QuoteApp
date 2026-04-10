@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ActionStackView: View {
     let toolbarState: ActionToolbarState
+    let reviewStatusState: ReviewStatusButton.State
     let recordingToolbarState: RecordingInputToolbarState
     let onPlaybackTapped: () -> Void
     let onRecordTapped: () -> Void
@@ -53,7 +54,7 @@ struct ActionStackView: View {
     }
 
     private var analysisGroup: some View {
-        ReviewStatusButton(state: toolbarState.reviewState, action: onReviewTapped)
+        ReviewStatusButton(state: reviewStatusState, action: onReviewTapped)
     }
 
     private var recordButton: some View {
@@ -102,6 +103,7 @@ struct ActionStackView_Previews: PreviewProvider {
     ) -> some View {
         ActionStackView(
             toolbarState: state,
+            reviewStatusState: state.reviewState,
             recordingToolbarState: recordingState,
             onPlaybackTapped: {},
             onRecordTapped: {},

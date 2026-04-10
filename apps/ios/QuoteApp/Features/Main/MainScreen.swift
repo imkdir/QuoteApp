@@ -26,6 +26,11 @@ struct MainScreen: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
+        .sheet(item: $viewModel.feedbackSheetAnalysis) { analysis in
+            TutorFeedbackSheet(analysis: analysis)
+                .presentationDetents([.height(240), .medium])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     @ViewBuilder
@@ -35,8 +40,8 @@ struct MainScreen: View {
             StartView(onPickQuote: viewModel.openQuotePicker)
                 .padding(24)
 
-        case let .practice(quote):
-            practiceView(quote: quote)
+        case let .practice(session):
+            practiceView(quote: session.quote)
                 .padding(.horizontal, 24)
                 .padding(.top, 20)
                 .padding(.bottom, 24)
@@ -59,6 +64,7 @@ struct MainScreen: View {
 
             ActionStackView(
                 toolbarState: viewModel.actionToolbarState,
+                reviewStatusState: viewModel.reviewStatusState,
                 recordingToolbarState: viewModel.recordingToolbarState,
                 onPlaybackTapped: viewModel.playbackTapped,
                 onRecordTapped: viewModel.recordTapped,
@@ -80,32 +86,23 @@ struct MainScreen: View {
 struct MainScreen_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            MainScreen(viewModel: .previewStart)
-                .previewDisplayName("Start State")
+            MainScreen(viewModel: .previewReviewedInfoClosed)
+                .previewDisplayName("Reviewed Info (Sheet Closed)")
 
-            MainScreen(viewModel: .previewActionStateSpeaking)
-                .previewDisplayName("Speaking")
+            MainScreen(viewModel: .previewReviewedInfoPresented)
+                .previewDisplayName("Reviewed Info (Sheet Presented)")
 
-            MainScreen(viewModel: .previewActionStatePaused)
-                .previewDisplayName("Paused/Finished")
-
-            MainScreen(viewModel: .previewActionStateRecording)
-                .previewDisplayName("Recording")
-
-            MainScreen(viewModel: .previewActionStateSendReady)
-                .previewDisplayName("Stopped/Send Ready")
-
-            MainScreen(viewModel: .previewActionStateReviewing)
-                .previewDisplayName("Reviewing")
-
-            MainScreen(viewModel: .previewActionStateReviewedInfo)
-                .previewDisplayName("Reviewed Info")
-
-            MainScreen(viewModel: .previewActionStateReviewedPerfect)
+            MainScreen(viewModel: .previewReviewedPerfect)
                 .previewDisplayName("Reviewed Perfect")
 
-            MainScreen(viewModel: .previewActionStateUnavailable)
+            MainScreen(viewModel: .previewUnavailable)
                 .previewDisplayName("Unavailable")
+
+            MainScreen(viewModel: .previewLoading)
+                .previewDisplayName("Loading")
+
+            MainScreen(viewModel: .previewSendReadyWithOlderReviewedInfo)
+                .previewDisplayName("Send Ready + Older Reviewed Info")
         }
     }
 }

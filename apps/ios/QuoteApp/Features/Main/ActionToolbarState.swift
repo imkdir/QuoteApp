@@ -13,11 +13,11 @@ enum ActionToolbarState: Equatable {
 
     var playbackMode: PlaybackActionButton.Mode? {
         switch self {
-        case .default, .pausedOrFinished, .reviewing, .reviewedInfo, .reviewedPerfect, .unavailable:
-            return .repeat
         case .speaking:
             return .pause
-        case .recording, .recordedReadyToSend:
+        case .default, .pausedOrFinished, .reviewedInfo, .reviewedPerfect, .unavailable:
+            return .repeat
+        case .recording, .recordedReadyToSend, .reviewing:
             return nil
         }
     }
@@ -57,7 +57,7 @@ enum ActionToolbarState: Equatable {
 
     var showsRecordButton: Bool {
         switch self {
-        case .recording, .recordedReadyToSend:
+        case .recording, .recordedReadyToSend, .reviewing, .speaking:
             return false
         default:
             return true

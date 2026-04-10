@@ -6,32 +6,98 @@ final class MainViewModel: ObservableObject {
     @Published var isQuotePickerPresented: Bool
     @Published var practiceStatusMessage: String
     @Published var spokenTokenCount: Int
-    @Published var markedTokens: [MarkedToken]
-    @Published var actionToolbarState: ActionToolbarState
-    @Published var recordingToolbarState: RecordingInputToolbarState
+    @Published var feedbackSheetAnalysis: PracticeAnalysis?
 
     let quotes: [Quote]
 
-    private var nextSendOutcomeCursor: Int = 0
-    private let sendOutcomeOrder: [ActionToolbarState] = [.reviewedInfo, .reviewedPerfect, .unavailable]
+    private var isTutorSpeaking: Bool
+    private var nextMockResultCursor: Int
+    private let mockResultOrder: [AnalysisState] = [.info, .perfect, .unavailable]
+    private var pendingMockOutcomes: [UUID: AnalysisState]
 
     init(
         quotes: [Quote] = MockQuotes.all,
         sessionState: MainSessionState = .start,
         isQuotePickerPresented: Bool = false,
         spokenTokenCount: Int = 0,
-        markedTokens: [MarkedToken] = [],
-        actionToolbarState: ActionToolbarState = .default,
-        recordingToolbarState: RecordingInputToolbarState = .recording
+        feedbackSheetAnalysis: PracticeAnalysis? = nil,
+        isTutorSpeaking: Bool = false,
+        nextMockResultCursor: Int = 0,
+        pendingMockOutcomes: [UUID: AnalysisState] = [:]
     ) {
         self.quotes = quotes
         self.sessionState = sessionState
         self.isQuotePickerPresented = isQuotePickerPresented
         self.practiceStatusMessage = "Tap Repeat to advance spoken words."
         self.spokenTokenCount = spokenTokenCount
-        self.markedTokens = markedTokens
-        self.actionToolbarState = actionToolbarState
-        self.recordingToolbarState = recordingToolbarState
+        self.feedbackSheetAnalysis = feedbackSheetAnalysis
+        self.isTutorSpeaking = isTutorSpeaking
+        self.nextMockResultCursor = nextMockResultCursor
+        self.pendingMockOutcomes = pendingMockOutcomes
+    }
+
+    var actionToolbarState: ActionToolbarState {
+        guard let session = sessionState.practiceSession else {
+            return .default
+        }
+
+        if let localDraft = session.localRecordingDraft {
+            switch localDraft.state {
+            case .recording:
+                return .recording
+            case .stopped:
+                return .recordedReadyToSend
+            }
+        }
+
+        if let latestAnalysis = session.latestAnalysis {
+            switch latestAnalysis.state {
+            case .loading:
+                return .reviewing
+            case .info:
+                return .reviewedInfo
+            case .perfect:
+                return .reviewedPerfect
+            case .unavailable:
+                return .unavailable
+            }
+        }
+
+        return isTutorSpeaking ? .speaking : .pausedOrFinished
+    }
+
+    var recordingToolbarState: RecordingInputToolbarState {
+        guard let localDraft = sessionState.practiceSession?.localRecordingDraft else {
+            return .recording
+        }
+
+        switch localDraft.state {
+        case .recording:
+            return .recording
+        case .stopped:
+            return .stopped
+        }
+    }
+
+    var reviewStatusState: ReviewStatusButton.State {
+        guard let state = sessionState.practiceSession?.latestAnalysis?.state else {
+            return .review
+        }
+
+        switch state {
+        case .loading:
+            return .reviewing
+        case .info:
+            return .reviewedInfo
+        case .perfect:
+            return .reviewedPerfect
+        case .unavailable:
+            return .unavailable
+        }
+    }
+
+    var latestAnalysis: PracticeAnalysis? {
+        sessionState.practiceSession?.latestAnalysis
     }
 
     var currentQuoteTokens: [QuoteToken] {
@@ -39,10 +105,16 @@ final class MainViewModel: ObservableObject {
             return []
         }
 
-        return selectedQuote.makeTokens(
-            spokenCount: spokenTokenCount,
-            markedTokenIndexes: Set(markedTokens.map(\.index))
+        let baseTokens = selectedQuote.makeTokens(spokenCount: spokenTokenCount, markedTokenIndexes: [])
+        let markedWordSet = Set(markedWordsFromLatestAnalysis)
+
+        let markedIndexes = Set(
+            baseTokens
+                .filter { markedWordSet.contains($0.normalizedText) }
+                .map(\.index)
         )
+
+        return selectedQuote.makeTokens(spokenCount: spokenTokenCount, markedTokenIndexes: markedIndexes)
     }
 
     func openQuotePicker() {
@@ -54,12 +126,11 @@ final class MainViewModel: ObservableObject {
     }
 
     func selectQuote(_ quote: Quote) {
-        sessionState = .practice(quote)
+        sessionState = .practice(PracticeSession(quote: quote))
         isQuotePickerPresented = false
         spokenTokenCount = 0
-        markedTokens = []
-        actionToolbarState = .default
-        recordingToolbarState = .recording
+        isTutorSpeaking = false
+        feedbackSheetAnalysis = nil
         practiceStatusMessage = "All words are dimmed. Tap Repeat to mock playback."
     }
 
@@ -68,18 +139,18 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        switch actionToolbarState {
-        case .speaking:
-            actionToolbarState = .pausedOrFinished
-            practiceStatusMessage = "Playback paused (mock)."
-
-        case .recording, .recordedReadyToSend:
-            break
-
-        default:
-            actionToolbarState = .speaking
-            advanceSpokenProgress()
+        guard sessionState.practiceSession?.localRecordingDraft == nil else {
+            return
         }
+
+        if isTutorSpeaking {
+            isTutorSpeaking = false
+            practiceStatusMessage = "Playback paused (mock)."
+            return
+        }
+
+        isTutorSpeaking = true
+        advanceSpokenProgress()
     }
 
     func recordTapped() {
@@ -87,43 +158,84 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        actionToolbarState = .recording
-        recordingToolbarState = .recording
+        let reference = "local-draft-\(Int(Date().timeIntervalSince1970))"
+
+        updatePracticeSession { session in
+            session.localRecordingDraft = LocalRecordingDraft(
+                recordingReference: reference,
+                state: .recording
+            )
+        }
+
+        feedbackSheetAnalysis = nil
+        isTutorSpeaking = false
         practiceStatusMessage = "Recording started (mock)."
     }
 
     func stopRecordingTapped() {
-        guard actionToolbarState == .recording else {
+        guard sessionState.isPractice else {
             return
         }
 
-        recordingToolbarState = .stopped
-        actionToolbarState = .recordedReadyToSend
+        updatePracticeSession { session in
+            guard var localDraft = session.localRecordingDraft else {
+                return
+            }
+
+            localDraft.state = .stopped
+            session.localRecordingDraft = localDraft
+        }
+
         practiceStatusMessage = "Recording stopped. Ready to send (mock)."
     }
 
     func closeRecordingTapped() {
-        guard actionToolbarState == .recording || actionToolbarState == .recordedReadyToSend else {
+        guard sessionState.isPractice else {
             return
         }
 
-        recordingToolbarState = .recording
-        actionToolbarState = .default
+        updatePracticeSession { session in
+            session.localRecordingDraft = nil
+        }
+
         practiceStatusMessage = "Recording dismissed. Back to default controls."
     }
 
     func sendTapped() {
-        guard actionToolbarState == .recordedReadyToSend else {
+        guard sessionState.isPractice else {
             return
         }
 
-        actionToolbarState = .reviewing
+        guard let localDraft = sessionState.practiceSession?.localRecordingDraft,
+              localDraft.state == .stopped else {
+            return
+        }
 
-        let nextOutcome = sendOutcomeOrder[nextSendOutcomeCursor]
-        nextSendOutcomeCursor = (nextSendOutcomeCursor + 1) % sendOutcomeOrder.count
-        applyReviewOutcome(nextOutcome)
+        let attemptID = UUID()
+        let newAttempt = PracticeAttempt(
+            id: attemptID,
+            recordingReference: localDraft.recordingReference,
+            analysis: PracticeAnalysis(
+                state: .loading,
+                feedbackText: "Reviewing your latest attempt."
+            )
+        )
 
-        recordingToolbarState = .recording
+        updatePracticeSession { session in
+            session.localRecordingDraft = nil
+            session.attempts.append(newAttempt)
+        }
+
+        let nextOutcome = mockResultOrder[nextMockResultCursor]
+        nextMockResultCursor = (nextMockResultCursor + 1) % mockResultOrder.count
+        pendingMockOutcomes[attemptID] = nextOutcome
+
+        practiceStatusMessage = "Reviewing latest attempt (mock)."
+        feedbackSheetAnalysis = nil
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            self?.resolveMockAnalysis(for: attemptID)
+        }
     }
 
     func reviewTapped() {
@@ -131,19 +243,26 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        switch actionToolbarState {
-        case .reviewing:
-            break
-        case .reviewedInfo:
-            applyReviewOutcome(.reviewedPerfect)
-        case .reviewedPerfect:
-            applyReviewOutcome(.unavailable)
-        case .unavailable:
-            applyReviewOutcome(.reviewedInfo)
-        default:
-            actionToolbarState = .reviewing
-            practiceStatusMessage = "Reviewing (mock)."
+        guard let latestAnalysis = latestAnalysis else {
+            practiceStatusMessage = "No review result yet."
+            return
         }
+
+        switch latestAnalysis.state {
+        case .loading:
+            return
+        case .info, .perfect, .unavailable:
+            feedbackSheetAnalysis = latestAnalysis
+        }
+    }
+
+    private var markedWordsFromLatestAnalysis: [String] {
+        guard let latestAnalysis = latestAnalysis,
+              latestAnalysis.state == .info else {
+            return []
+        }
+
+        return latestAnalysis.markedNormalizedTokens
     }
 
     private func advanceSpokenProgress() {
@@ -154,41 +273,85 @@ final class MainViewModel: ObservableObject {
         spokenTokenCount = min(spokenTokenCount + 3, selectedQuote.wordCount)
 
         if spokenTokenCount >= selectedQuote.wordCount {
-            actionToolbarState = .pausedOrFinished
+            isTutorSpeaking = false
             practiceStatusMessage = "Playback finished (mock)."
         } else {
             practiceStatusMessage = "Tutor speaking mock advanced to word \(spokenTokenCount)."
         }
     }
 
-    private func applyReviewOutcome(_ outcome: ActionToolbarState) {
-        actionToolbarState = outcome
-
-        guard let selectedQuote = sessionState.selectedQuote else {
+    private func resolveMockAnalysis(for attemptID: UUID) {
+        guard let practiceSession = sessionState.practiceSession,
+              let attemptIndex = practiceSession.attempts.firstIndex(where: { $0.id == attemptID }) else {
+            pendingMockOutcomes[attemptID] = nil
             return
         }
 
+        guard let outcome = pendingMockOutcomes.removeValue(forKey: attemptID),
+              let quote = sessionState.selectedQuote else {
+            return
+        }
+
+        let analysis = mockAnalysis(for: quote, state: outcome)
+
+        updatePracticeSession { session in
+            guard attemptIndex < session.attempts.count else {
+                return
+            }
+
+            session.attempts[attemptIndex].analysis = analysis
+        }
+
         switch outcome {
-        case .reviewedInfo:
-            markedTokens = sampleMarkedTokens(for: selectedQuote)
-            practiceStatusMessage = "Reviewed (info): sample words are underlined."
-        case .reviewedPerfect:
-            markedTokens = []
+        case .info:
+            practiceStatusMessage = "Reviewed (info): words marked on the quote."
+        case .perfect:
             practiceStatusMessage = "Reviewed (perfect): no marked words."
         case .unavailable:
-            markedTokens = []
             practiceStatusMessage = "Review unavailable (mock)."
-        default:
-            break
+        case .loading:
+            practiceStatusMessage = "Reviewing latest attempt (mock)."
         }
     }
 
-    private func sampleMarkedTokens(for quote: Quote) -> [MarkedToken] {
-        let markedWordSet = Set(quote.mockMarkedNormalizedTokens)
+    private func mockAnalysis(for quote: Quote, state: AnalysisState) -> PracticeAnalysis {
+        switch state {
+        case .loading:
+            return PracticeAnalysis(
+                state: .loading,
+                feedbackText: "Reviewing your latest attempt."
+            )
 
-        return quote.makeTokens(spokenCount: spokenTokenCount, markedTokenIndexes: [])
-            .filter { markedWordSet.contains($0.normalizedText) }
-            .map { MarkedToken(index: $0.index, normalizedText: $0.normalizedText) }
+        case .info:
+            let markedWords = Array(quote.mockMarkedNormalizedTokens.prefix(3))
+            return PracticeAnalysis(
+                state: .info,
+                markedNormalizedTokens: markedWords,
+                feedbackText: "Good effort. Keep vowels steady and stress the marked words more clearly."
+            )
+
+        case .perfect:
+            return PracticeAnalysis(
+                state: .perfect,
+                feedbackText: "Great pacing and pronunciation. This attempt sounds clear."
+            )
+
+        case .unavailable:
+            return PracticeAnalysis(
+                state: .unavailable,
+                feedbackText: "We could not complete this review for the latest attempt."
+            )
+        }
+    }
+
+    private func updatePracticeSession(_ transform: (inout PracticeSession) -> Void) {
+        guard case let .practice(currentSession) = sessionState else {
+            return
+        }
+
+        var updatedSession = currentSession
+        transform(&updatedSession)
+        sessionState = .practice(updatedSession)
     }
 }
 
@@ -197,78 +360,74 @@ extension MainViewModel {
         MainViewModel()
     }
 
-    static var previewPractice: MainViewModel {
-        previewPracticePartiallySpoken
+    static var previewReviewedInfoClosed: MainViewModel {
+        makeReviewPreview(state: .info, presentSheet: false)
     }
 
-    static var previewPracticeAllDimmed: MainViewModel {
-        let viewModel = MainViewModel()
-        if let firstQuote = viewModel.quotes.first {
-            viewModel.selectQuote(firstQuote)
+    static var previewReviewedInfoPresented: MainViewModel {
+        makeReviewPreview(state: .info, presentSheet: true)
+    }
+
+    static var previewReviewedPerfect: MainViewModel {
+        makeReviewPreview(state: .perfect, presentSheet: false)
+    }
+
+    static var previewUnavailable: MainViewModel {
+        makeReviewPreview(state: .unavailable, presentSheet: false)
+    }
+
+    static var previewLoading: MainViewModel {
+        makeReviewPreview(state: .loading, presentSheet: false)
+    }
+
+    static var previewSendReadyWithOlderReviewedInfo: MainViewModel {
+        let viewModel = makeReviewPreview(state: .info, presentSheet: false)
+        viewModel.updatePracticeSession { session in
+            session.localRecordingDraft = LocalRecordingDraft(
+                recordingReference: "local-draft-preview",
+                state: .stopped
+            )
         }
+        viewModel.practiceStatusMessage = "Recording stopped. Ready to send (mock)."
         return viewModel
     }
 
-    static var previewPracticePartiallySpoken: MainViewModel {
-        let viewModel = MainViewModel.previewPracticeAllDimmed
-        viewModel.playbackTapped()
-        viewModel.playbackTapped()
+    private static func makeReviewPreview(state: AnalysisState, presentSheet: Bool) -> MainViewModel {
+        let viewModel = MainViewModel()
+        guard let quote = viewModel.quotes.first else {
+            return viewModel
+        }
+
+        let analysis = viewModel.mockAnalysis(for: quote, state: state)
+        let attempt = PracticeAttempt(recordingReference: "attempt-preview", analysis: analysis)
+
+        viewModel.sessionState = .practice(
+            PracticeSession(
+                quote: quote,
+                attempts: [attempt],
+                localRecordingDraft: nil
+            )
+        )
+
+        viewModel.practiceStatusMessage = previewStatusMessage(for: state)
+
+        if presentSheet {
+            viewModel.feedbackSheetAnalysis = analysis
+        }
+
         return viewModel
     }
 
-    static var previewPracticeMarked: MainViewModel {
-        let viewModel = MainViewModel.previewPracticePartiallySpoken
-        viewModel.applyReviewOutcome(.reviewedInfo)
-        return viewModel
-    }
-
-    static var previewActionStateSpeaking: MainViewModel {
-        let viewModel = MainViewModel.previewPracticeAllDimmed
-        viewModel.actionToolbarState = .speaking
-        return viewModel
-    }
-
-    static var previewActionStatePaused: MainViewModel {
-        let viewModel = MainViewModel.previewPracticeAllDimmed
-        viewModel.actionToolbarState = .pausedOrFinished
-        return viewModel
-    }
-
-    static var previewActionStateRecording: MainViewModel {
-        let viewModel = MainViewModel.previewPracticeAllDimmed
-        viewModel.actionToolbarState = .recording
-        viewModel.recordingToolbarState = .recording
-        return viewModel
-    }
-
-    static var previewActionStateSendReady: MainViewModel {
-        let viewModel = MainViewModel.previewPracticeAllDimmed
-        viewModel.actionToolbarState = .recordedReadyToSend
-        viewModel.recordingToolbarState = .stopped
-        return viewModel
-    }
-
-    static var previewActionStateReviewing: MainViewModel {
-        let viewModel = MainViewModel.previewPracticeAllDimmed
-        viewModel.actionToolbarState = .reviewing
-        return viewModel
-    }
-
-    static var previewActionStateReviewedInfo: MainViewModel {
-        let viewModel = MainViewModel.previewPracticeAllDimmed
-        viewModel.applyReviewOutcome(.reviewedInfo)
-        return viewModel
-    }
-
-    static var previewActionStateReviewedPerfect: MainViewModel {
-        let viewModel = MainViewModel.previewPracticeAllDimmed
-        viewModel.applyReviewOutcome(.reviewedPerfect)
-        return viewModel
-    }
-
-    static var previewActionStateUnavailable: MainViewModel {
-        let viewModel = MainViewModel.previewPracticeAllDimmed
-        viewModel.applyReviewOutcome(.unavailable)
-        return viewModel
+    private static func previewStatusMessage(for state: AnalysisState) -> String {
+        switch state {
+        case .loading:
+            return "Reviewing latest attempt (mock)."
+        case .info:
+            return "Reviewed (info): words marked on the quote."
+        case .perfect:
+            return "Reviewed (perfect): no marked words."
+        case .unavailable:
+            return "Review unavailable (mock)."
+        }
     }
 }

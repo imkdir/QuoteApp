@@ -37,7 +37,12 @@ struct ReviewStatusButton: View {
         }
 
         var isTappable: Bool {
-            self != .reviewing
+            switch self {
+            case .reviewing:
+                return false
+            default:
+                return true
+            }
         }
     }
 
