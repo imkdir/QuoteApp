@@ -26,8 +26,8 @@ struct QuoteTextView: View {
             let index = pair.offset
             let token = pair.element
             let tokenText = styledText(for: token)
-            let spacingText = index == tokens.count - 1 ? Text("") : Text(" ")
-            return partialResult + tokenText + spacingText
+            let prefixText = separatorTextBeforeToken(at: index)
+            return partialResult + prefixText + tokenText
         }
     }
 
@@ -46,6 +46,25 @@ struct QuoteTextView: View {
 
     private var markedWordCount: Int {
         tokens.filter { $0.isMarked }.count
+    }
+
+    private func separatorTextBeforeToken(at index: Int) -> Text {
+        guard index > 0 else {
+            let leadingLineBreaks = max(0, tokens[index].lineIndex)
+            if leadingLineBreaks == 0 {
+                return Text("")
+            }
+            return Text(String(repeating: "\n", count: leadingLineBreaks))
+        }
+
+        let previousToken = tokens[index - 1]
+        let currentToken = tokens[index]
+        let lineAdvance = currentToken.lineIndex - previousToken.lineIndex
+
+        if lineAdvance > 0 {
+            return Text(String(repeating: "\n", count: lineAdvance))
+        }
+        return Text(" ")
     }
 }
 

@@ -50,27 +50,58 @@ struct Quote: Identifiable, Hashable, Decodable {
     }
 
     var wordCount: Int {
-        fullText.split(whereSeparator: { $0.isWhitespace }).count
+        tokenizedWordsByLine().reduce(into: 0) { partialResult, lineWords in
+            partialResult += lineWords.count
+        }
     }
 
     func makeTokens(spokenCount: Int, markedTokenIndexes: Set<Int>) -> [QuoteToken] {
-        let rawTokens = fullText.split(whereSeparator: { $0.isWhitespace }).map(String.init)
-        let clampedSpokenCount = max(0, min(spokenCount, rawTokens.count))
-
-        return rawTokens.enumerated().map { index, rawToken in
-            QuoteToken(
-                index: index,
-                rawText: rawToken,
-                normalizedText: normalize(rawToken),
-                isSpoken: index < clampedSpokenCount,
-                isMarked: markedTokenIndexes.contains(index)
-            )
+        let wordsByLine = tokenizedWordsByLine()
+        let totalTokenCount = wordsByLine.reduce(into: 0) { partialResult, lineWords in
+            partialResult += lineWords.count
         }
+        let clampedSpokenCount = max(0, min(spokenCount, totalTokenCount))
+
+        var flattenedTokens: [QuoteToken] = []
+        flattenedTokens.reserveCapacity(totalTokenCount)
+
+        var globalIndex = 0
+        for (lineIndex, lineWords) in wordsByLine.enumerated() {
+            for rawToken in lineWords {
+                flattenedTokens.append(
+                    QuoteToken(
+                        index: globalIndex,
+                        lineIndex: lineIndex,
+                        rawText: rawToken,
+                        normalizedText: normalize(rawToken),
+                        isSpoken: globalIndex < clampedSpokenCount,
+                        isMarked: markedTokenIndexes.contains(globalIndex)
+                    )
+                )
+                globalIndex += 1
+            }
+        }
+
+        return flattenedTokens
     }
 
     private func normalize(_ token: String) -> String {
         token
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9']", with: "", options: .regularExpression)
+    }
+
+    private func tokenizedWordsByLine() -> [[String]] {
+        let normalizedLineEndings = fullText
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let lines = normalizedLineEndings.split(
+            separator: "\n",
+            omittingEmptySubsequences: false
+        )
+
+        return lines.map { line in
+            line.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        }
     }
 }

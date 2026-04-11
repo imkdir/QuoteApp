@@ -85,6 +85,7 @@ Rules:
 Implementation note:
 
 * Use a single quote text component.
+* Preserve intentional line breaks from the source quote text in the UI
 * Do not split quote rendering into multiple overlapping quote layers.
 * Do not add metadata or extra quote-surface controls in the MVP.
 
