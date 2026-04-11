@@ -200,6 +200,14 @@ def play_tutor_quote(session_id: str) -> TutorPlaybackCommandResponse:
     try:
         _TUTOR_RUNTIME.request_quote_playback(session_id=session_id, settings=settings)
         _sync_tutor_status(session_id)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "tutor_unavailable",
+                "message": str(exc),
+            },
+        ) from exc
     except Exception as exc:  # noqa: BLE001 - runtime boundary
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

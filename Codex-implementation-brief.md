@@ -524,6 +524,10 @@ Responsibilities:
 * handle playback session context
 * receive learner attempt
 * prepare or request analysis result
+* tutor speech must be produced as real audio from the backend tutor path
+* the tutor should speak only the exact selected quote text
+* transcript or timing data may be sent as companion metadata, but audio is the primary playback output
+* do not rely on OS-level shell TTS or local iOS TTS as the main tutor voice path
 
 ### Backend task 7 — Analysis result shaping
 
@@ -566,6 +570,10 @@ The backend exists for two reasons:
 
 1. LiveKit token generation must happen server-side.
 2. The tutor agent runs as a backend participant and owns practice/review logic.
+3. Tutor playback audio is the primary speech output.
+   - The learner should hear real tutor audio from the backend/LiveKit path.
+   - Text, transcript, timing, or data-channel messages are secondary metadata only.
+   - Do not use local iOS TTS or OS-level shell TTS as the primary tutor playback path.
 
 Additionally, the backend is the natural place for:
 

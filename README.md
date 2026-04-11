@@ -42,7 +42,14 @@
   - selected quote text
 - The backend starts a tutor runtime worker per session that attempts to:
   - join the LiveKit room as `tutor-<session-prefix>`
-  - publish tutor quote script into the room data channel topic `quoteapp.tutor.quote_script`
+  - synthesize and publish quote audio from backend TTS inference (`/audio/speech`) as the primary tutor voice path
+  - publish quote script metadata (`quoteapp.tutor.quote_script`) only as companion data after audio starts
+- Tutor playback speech content:
+  - backend speaks only the selected quote text (no preamble/instructions)
+  - punctuation and meaningful line breaks are preserved for natural phrasing
+  - backend strips wrapper-only markdown artifacts before synthesis
+  - backend picks TTS provider from available credentials (`OPENAI_API_KEY` or `GEMINI_API_KEY`) when `TUTOR_TTS_PROVIDER=auto`
+  - voice/model are configurable via `TUTOR_TTS_PROVIDER`, `TUTOR_TTS_MODEL`, `TUTOR_TTS_VOICE`
 - Learner audio submission:
   - `POST /practice/session/{session_id}/attempt/submit` with raw bytes (`application/octet-stream`)
   - backend stores audio under temp directory `quoteapp-submissions/<session_id>/`
