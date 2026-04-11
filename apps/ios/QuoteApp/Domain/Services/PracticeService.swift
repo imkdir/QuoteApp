@@ -208,8 +208,10 @@ struct PracticeService {
             let dto = try JSONDecoder().decode(LatestResultResponseDTO.self, from: data)
             let mappedState = AnalysisState(backendValue: dto.stateRaw)
 
-            let markedWords = dto.markedTokens.map { token in
-                token.normalizedText.isEmpty ? token.text.lowercased() : token.normalizedText
+            let markedWords = dto.markedTokens.compactMap { token in
+                let source = token.normalizedText.isEmpty ? token.text : token.normalizedText
+                let normalized = Self.normalizeMarkedToken(source)
+                return normalized.isEmpty ? nil : normalized
             }
 
             return PracticeLatestResult(
@@ -465,5 +467,12 @@ struct PracticeService {
             return value
         }
         return value + String(repeating: "=", count: 4 - remainder)
+    }
+
+    private static func normalizeMarkedToken(_ token: String) -> String {
+        token
+            .replacingOccurrences(of: "[’‘`]", with: "'", options: .regularExpression)
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9']", with: "", options: .regularExpression)
     }
 }

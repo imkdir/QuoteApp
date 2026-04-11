@@ -15,7 +15,8 @@ from app.agents.prompts import (
 from app.models.analysis_result import AnalysisState, TutorReviewResult
 from app.models.marked_token import MarkedToken
 
-_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9']+")
+_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9]+(?:['’‘`][A-Za-z0-9]+)*")
+_APOSTROPHE_PATTERN = re.compile(r"[’‘`]")
 _MAX_MARKED_TOKENS = 8
 
 
@@ -84,7 +85,7 @@ def _normalized_quote_tokens(quote_text: Optional[str]) -> list[_QuoteToken]:
         return []
 
     return [
-        _QuoteToken(text=token, normalized=token.lower())
+        _QuoteToken(text=token, normalized=_normalize_token(token))
         for token in _TOKEN_PATTERN.findall(quote_text)
         if token
     ]
@@ -95,10 +96,14 @@ def _normalized_transcript_tokens(transcript_text: Optional[str]) -> list[str]:
         return []
 
     return [
-        token.lower()
+        _normalize_token(token)
         for token in _TOKEN_PATTERN.findall(transcript_text)
         if token
     ]
+
+
+def _normalize_token(token: str) -> str:
+    return _APOSTROPHE_PATTERN.sub("'", token).lower()
 
 
 def _find_mismatched_quote_tokens(

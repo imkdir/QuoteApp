@@ -42,6 +42,7 @@ struct Quote: Identifiable, Hashable, Decodable {
 
     private func normalize(_ token: String) -> String {
         token
+            .replacingOccurrences(of: "[’‘`]", with: "'", options: .regularExpression)
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9']", with: "", options: .regularExpression)
     }

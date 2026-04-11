@@ -322,6 +322,10 @@ final class MainViewModel: ObservableObject {
                 let backendQuotes = try await quoteRepository.fetchQuotes()
                 quotes = backendQuotes
                 quoteLoadingErrorMessage = nil
+                await refreshLiveAPIStatusAfterRequestSuccess(
+                    for: nil,
+                    sessionID: nil
+                )
             } catch {
                 refreshLiveAPIStatusAfterRequestError(error)
                 quoteLoadingErrorMessage = "Could not load quotes. Check backend and retry."
@@ -443,6 +447,10 @@ final class MainViewModel: ObservableObject {
                     self.updatePracticeSession { session in
                         session.tutorPlaybackIdentity = artifact.playbackIdentity
                     }
+                    await self.refreshLiveAPIStatusAfterRequestSuccess(
+                        for: selectedQuote,
+                        sessionID: self.currentBackendSessionID
+                    )
                     try self.tutorPlaybackManager.beginPlaybackFromCachedAudioFile(
                         fileURL: cachedFileURL,
                         wordCount: artifact.wordCount > 0 ? artifact.wordCount : selectedQuote.wordCount,
@@ -660,6 +668,10 @@ final class MainViewModel: ObservableObject {
                     backendAttemptID: submission.attemptID,
                     recordingReference: submission.recordingReference
                 )
+                await self.refreshLiveAPIStatusAfterRequestSuccess(
+                    for: selectedQuote,
+                    sessionID: submission.sessionID
+                )
 
                 if submission.state != .loading {
                     let immediateAnalysis = PracticeAnalysis(
@@ -681,6 +693,10 @@ final class MainViewModel: ObservableObject {
                 let latestResult = try await analysisPollingService.pollLatestResult(
                     sessionID: submission.sessionID,
                     repository: practiceRepository
+                )
+                await self.refreshLiveAPIStatusAfterRequestSuccess(
+                    for: selectedQuote,
+                    sessionID: latestResult.sessionID
                 )
                 self.applyBackendResult(latestResult, toLocalAttemptID: attemptID)
             } catch is CancellationError {
@@ -794,6 +810,10 @@ final class MainViewModel: ObservableObject {
                     session.tutorPlaybackIdentity = tutorPlaybackIdentity
                 }
             }
+            await refreshLiveAPIStatusAfterRequestSuccess(
+                for: quote,
+                sessionID: startedSession.sessionID
+            )
 
             return startedSession.sessionID
         } catch {
@@ -895,6 +915,10 @@ final class MainViewModel: ObservableObject {
                 pendingTutorPlaybackSessionID = recoveredSessionID
                 try await practiceRepository.requestTutorPlayback(sessionID: recoveredSessionID)
             }
+            await refreshLiveAPIStatusAfterRequestSuccess(
+                for: quote,
+                sessionID: pendingTutorPlaybackSessionID ?? sessionID
+            )
             let isRestartFromBeginning = playbackStateBeforeCommand.isFinishedAtEnd
             practiceStatusMessage = isRestartFromBeginning
                 ? "Tutor playback restarting from the beginning."
@@ -1052,6 +1076,10 @@ final class MainViewModel: ObservableObject {
 
         do {
             try await practiceRepository.stopTutorPlayback(sessionID: sessionID)
+            await refreshLiveAPIStatusAfterRequestSuccess(
+                for: sessionState.selectedQuote,
+                sessionID: sessionID
+            )
         } catch {
             refreshLiveAPIStatusAfterRequestError(error)
             return
@@ -1231,7 +1259,33 @@ final class MainViewModel: ObservableObject {
         for quote: Quote,
         sessionID: String
     ) async {
-        guard case .failed = liveKitConnectionState else {
+        switch liveKitConnectionState {
+        case .failed, .disconnected:
+            break
+        default:
+            return
+        }
+
+        await connectLiveKitIfNeeded(for: quote, sessionID: sessionID)
+    }
+
+    private func refreshLiveAPIStatusAfterRequestSuccess(
+        for quote: Quote?,
+        sessionID: String?
+    ) async {
+        switch liveKitConnectionState {
+        case .failed, .disconnected:
+            break
+        default:
+            return
+        }
+
+        guard let quote, let sessionID, !sessionID.isEmpty else {
+            if case .failed = liveKitConnectionState {
+                let nextState = LiveKitConnectionState.disconnected
+                liveKitConnectionState = nextState
+                tutorPlaybackManager.applyLiveKitConnectionState(nextState)
+            }
             return
         }
 
