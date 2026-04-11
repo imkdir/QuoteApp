@@ -13,14 +13,16 @@ from time import sleep
 from uuid import uuid4
 
 from app.agents.analysis_mapper import (
-    AttemptAnalysisInput,
+    TranscriptAnalysisInput,
     loading_result,
-    map_attempt_to_review,
+    map_transcript_to_review,
     unavailable_result,
 )
+from app.config import get_settings
 from app.models.analysis_result import AnalysisState
 from app.models.practice_session import PracticeAttempt, PracticeSession
 from app.services.result_service import make_superseded_unavailable_result
+from app.services.transcription_service import TranscriptionError, transcribe_learner_audio
 
 
 class SessionNotFoundError(Exception):
@@ -133,7 +135,7 @@ def submit_practice_attempt(
         _resolve_review_for_attempt,
         session_id,
         attempt_id,
-        audio_bytes,
+        str(recording_path),
         tutor_available,
         tutor_failure_reason,
     )
@@ -194,7 +196,7 @@ def make_livekit_room_name(*, quote_id: str, session_id: str) -> str:
 def _resolve_review_for_attempt(
     session_id: str,
     attempt_id: str,
-    audio_bytes: bytes,
+    recording_reference: str,
     tutor_available: bool,
     tutor_failure_reason: Optional[str],
 ) -> None:
@@ -218,15 +220,31 @@ def _resolve_review_for_attempt(
         quote_text = session.quote_text
 
     try:
-        review_result = map_attempt_to_review(
-            AttemptAnalysisInput(
-                quote_text=quote_text,
-                attempt_id=attempt_id,
-                audio_size_bytes=len(audio_bytes),
-                tutor_available=tutor_available,
-                failure_reason=tutor_failure_reason,
+        if not tutor_available:
+            review_result = unavailable_result(
+                reason=tutor_failure_reason or "tutor agent is unavailable"
             )
-        )
+        elif not quote_text or not quote_text.strip():
+            review_result = unavailable_result(reason="quote context was unavailable")
+        else:
+            recording_path = Path(recording_reference)
+            audio_bytes = recording_path.read_bytes()
+            transcript_text = transcribe_learner_audio(
+                audio_bytes=audio_bytes,
+                filename=recording_path.name,
+                quote_text=quote_text,
+                settings=get_settings(),
+            )
+            review_result = map_transcript_to_review(
+                TranscriptAnalysisInput(
+                    quote_text=quote_text,
+                    transcript_text=transcript_text,
+                )
+            )
+    except FileNotFoundError:
+        review_result = unavailable_result(reason="submitted recording could not be loaded")
+    except TranscriptionError as exc:
+        review_result = unavailable_result(reason=str(exc))
     except Exception:  # noqa: BLE001 - defensive mapper boundary
         review_result = unavailable_result(reason="backend review pipeline failed")
 

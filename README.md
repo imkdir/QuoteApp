@@ -23,7 +23,7 @@ This is intentionally not a generic chat app. It is a focused quote-reading prac
   - FastAPI API for quotes, practice session lifecycle, submission, and polling
   - backend LiveKit token minting (`/livekit/token`)
   - backend tutor runtime that generates tutor quote audio from backend TTS providers
-  - backend result shaping into app-facing states (`loading`, `info`, `perfect`, `unavailable`)
+  - backend learner-review path: transcribe submitted learner audio, compare transcript tokens to quote tokens, and map into app-facing states (`loading`, `info`, `perfect`, `unavailable`)
   - backend-generated tutor audio artifact identity + cache for replay efficiency
 
 ### Playback Contract (Important)
@@ -39,7 +39,10 @@ This is intentionally not a generic chat app. It is a focused quote-reading prac
 - macOS with Xcode 15+ (tested with iOS target 16.0)
 - Python 3.11+
 - LiveKit project credentials
-- At least one backend TTS credential:
+- Backend learner-review transcription credential:
+  - `OPENAI_API_KEY`, or
+  - `GEMINI_API_KEY`
+- At least one backend tutor TTS credential:
   - `OPENAI_API_KEY`, or
   - `GEMINI_API_KEY`
 
@@ -51,9 +54,11 @@ This is intentionally not a generic chat app. It is a focused quote-reading prac
    - `LIVEKIT_URL`
    - `LIVEKIT_API_KEY`
    - `LIVEKIT_API_SECRET`
-   - `OPENAI_API_KEY` or `GEMINI_API_KEY`
+   - `OPENAI_API_KEY` or `GEMINI_API_KEY` (required for learner-audio review transcription)
+   - `OPENAI_API_KEY` or `GEMINI_API_KEY` (required for tutor TTS)
 3. Optional tuning:
    - `TUTOR_TTS_PROVIDER`, `TUTOR_TTS_MODEL`, `TUTOR_TTS_VOICE`, `TUTOR_TTS_SPEED`
+   - `REVIEW_STT_PROVIDER`, `REVIEW_STT_MODEL`
 
 Run a readiness check anytime:
 
@@ -120,7 +125,7 @@ xcodegen generate
 
 - One-screen multi-phase flow instead of multiple pages, to keep user loop tight.
 - Review output is quote-surface-first, with minimal secondary sheet details.
-- Review logic is intentionally modest and honest (coarse correctness states, no phoneme-level claims).
+- Review logic is intentionally modest and honest: transcript-vs-quote word mismatch detection, not phoneme-level scoring.
 - Backend-generated audio path is prioritized over local synthesis.
 - Playback cache strategy:
   - backend identity + backend artifact cache,
@@ -130,7 +135,8 @@ xcodegen generate
 
 - Quote catalog is in-memory and small.
 - Practice/session data is in-memory; no persistence or auth.
-- Review shaping is deterministic heuristic logic, not full pronunciation scoring.
+- Learner review currently depends on external STT availability and transcript quality.
+- Review is word-level transcript comparison, not a full pronunciation or phoneme analysis engine.
 - LiveKit SDK availability and network setup are required for full room behavior.
 - Device/LAN testing depends on local network reachability and firewall settings.
 

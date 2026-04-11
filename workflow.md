@@ -60,6 +60,11 @@ Direct (single-pass or near single-pass):
 - Device-side cache reuse remains keyed by backend playback identity.
 - Cache invalidation is tied to quote content + backend voice/model config + versioned identity.
 
+4. Learner review moved from mock selection to real audio grounding
+- Review no longer maps outcomes from attempt ID, audio byte size, or deterministic hash selectors.
+- Backend now transcribes submitted learner audio and compares transcript tokens against the selected quote.
+- Marked tokens are generated from quote-side word mismatches (omissions/substitutions), with `perfect/info/unavailable` mapped from that real analysis path.
+
 ## Final Validation Approach
 
 - Static code inspection of iOS state ownership and backend endpoint paths.

@@ -39,6 +39,24 @@ if [ -z "${OPENAI_API_KEY:-}" ] && [ -z "${GEMINI_API_KEY:-}" ]; then
   missing_tts+=("OPENAI_API_KEY or GEMINI_API_KEY")
 fi
 
+review_stt_provider="$(printf '%s' "${REVIEW_STT_PROVIDER:-auto}" | tr '[:upper:]' '[:lower:]')"
+missing_review_stt=()
+if [ "$review_stt_provider" = "openai" ]; then
+  if [ -z "${OPENAI_API_KEY:-}" ]; then
+    missing_review_stt+=("OPENAI_API_KEY")
+  fi
+elif [ "$review_stt_provider" = "gemini" ]; then
+  if [ -z "${GEMINI_API_KEY:-}" ]; then
+    missing_review_stt+=("GEMINI_API_KEY")
+  fi
+elif [ "$review_stt_provider" = "auto" ]; then
+  if [ -z "${OPENAI_API_KEY:-}" ] && [ -z "${GEMINI_API_KEY:-}" ]; then
+    missing_review_stt+=("OPENAI_API_KEY or GEMINI_API_KEY")
+  fi
+elif [ "$review_stt_provider" != "none" ] && [ "$review_stt_provider" != "disabled" ]; then
+  missing_review_stt+=("REVIEW_STT_PROVIDER must be one of: auto, openai, gemini, none, disabled")
+fi
+
 if [ ${#missing_livekit[@]} -eq 0 ]; then
   echo "[ok] LiveKit token config is complete."
 else
@@ -54,7 +72,14 @@ else
   echo "          Set at least one of: ${missing_tts[*]}"
 fi
 
-if [ ${#missing_livekit[@]} -eq 0 ] && [ ${#missing_tts[@]} -eq 0 ]; then
+if [ ${#missing_review_stt[@]} -eq 0 ]; then
+  echo "[ok] Learner review STT credentials are present (provider=$review_stt_provider)."
+else
+  echo "[missing] Learner review STT credentials are incomplete."
+  echo "          Set: ${missing_review_stt[*]}"
+fi
+
+if [ ${#missing_livekit[@]} -eq 0 ] && [ ${#missing_tts[@]} -eq 0 ] && [ ${#missing_review_stt[@]} -eq 0 ]; then
   echo ""
   echo "Environment is ready for full end-to-end practice runs."
   exit 0

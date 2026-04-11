@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     tutor_tts_speed: float = 1.0
     tutor_tts_timeout_seconds: float = 30.0
     tutor_tts_style_version: str = "quote_reader_v1"
+    review_stt_provider: str = "auto"
+    review_stt_model: Optional[str] = None
+    review_stt_timeout_seconds: float = 30.0
     openai_api_key: Optional[str] = None
     openai_base_url: str = "https://api.openai.com/v1"
     gemini_api_key: Optional[str] = None
@@ -70,6 +73,18 @@ class Settings(BaseSettings):
         return max(5.0, min(120.0, self.tutor_tts_timeout_seconds))
 
     @property
+    def review_stt_provider_normalized(self) -> str:
+        """Returns normalized learner review STT provider id."""
+
+        return self.review_stt_provider.strip().lower()
+
+    @property
+    def review_stt_timeout_seconds_clamped(self) -> float:
+        """Returns safe network timeout bounds for backend STT calls."""
+
+        return max(5.0, min(120.0, self.review_stt_timeout_seconds))
+
+    @property
     def openai_base_url_normalized(self) -> str:
         """Returns OpenAI base URL without trailing slash."""
 
@@ -80,6 +95,7 @@ class Settings(BaseSettings):
         """Returns Gemini base URL without trailing slash."""
 
         return self.gemini_base_url.rstrip("/")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
