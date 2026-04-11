@@ -46,11 +46,20 @@ The visual direction should follow the approved mock:
 
 ## Product behavior
 
-### Tutor playback rule
+### Tutor playback contract
 
-When the tutor reads the selected quote aloud, it must speak only the exact quote text.
-Do not add any preamble, instruction, commentary, encouragement, or extra words before or after the quote.
-Feedback belongs to the review phase, not the playback phase.
+Tutor playback is a real media path, not a local prototype shortcut.
+
+Rules:
+
+* the learner should hear real tutor audio from the backend/LiveKit path
+* audio is the primary tutor playback output
+* transcript, timing, or data-channel messages are secondary metadata only
+* do not use local iOS TTS as the primary tutor voice path
+* do not use OS-level shell TTS such as macOS `say` as the primary tutor voice path
+* when the tutor reads the selected quote aloud, it must speak only the exact quote text
+* do not add preambles, instructions, commentary, praise, or any extra words before or after the quote
+* feedback belongs to the review phase, not the playback phase
 
 ### Quote rendering model
 
@@ -524,10 +533,14 @@ Responsibilities:
 * handle playback session context
 * receive learner attempt
 * prepare or request analysis result
+
+Additional hard rules:
+
 * tutor speech must be produced as real audio from the backend tutor path
 * the tutor should speak only the exact selected quote text
 * transcript or timing data may be sent as companion metadata, but audio is the primary playback output
 * do not rely on OS-level shell TTS or local iOS TTS as the main tutor voice path
+* do not use transcript/data-channel text as a substitute for tutor speech
 
 ### Backend task 7 — Analysis result shaping
 
@@ -566,14 +579,15 @@ The client should show a simple explanation of the failure via a bottom sheet.
 
 ## Backend responsibilities
 
-The backend exists for two reasons:
+The backend exists for these reasons:
 
 1. LiveKit token generation must happen server-side.
 2. The tutor agent runs as a backend participant and owns practice/review logic.
 3. Tutor playback audio is the primary speech output.
-   - The learner should hear real tutor audio from the backend/LiveKit path.
-   - Text, transcript, timing, or data-channel messages are secondary metadata only.
-   - Do not use local iOS TTS or OS-level shell TTS as the primary tutor playback path.
+
+   * The learner should hear real tutor audio from the backend/LiveKit path.
+   * Text, transcript, timing, or data-channel messages are secondary metadata only.
+   * Do not use local iOS TTS or OS-level shell TTS as the primary tutor playback path.
 
 Additionally, the backend is the natural place for:
 
@@ -771,6 +785,7 @@ A short paragraph describing:
 * LiveKit token endpoint
 * LiveKit Agent tutor
 * analysis result mapping
+* backend-generated tutor audio as the primary playback path
 
 ### 3. Setup requirements
 
@@ -805,6 +820,7 @@ Include:
 * quote-centered review instead of generic chat
 * lightweight analysis states including review-unavailable
 * modest pronunciation feedback claims
+* backend audio as primary tutor playback instead of local TTS fallback
 
 ### 8. Known limitations
 
@@ -891,3 +907,5 @@ Polish transitions and cleanup README/setup.
 * Do not over-engineer pronunciation scoring.
 * The most important thing is a believable end-to-end speaking-practice loop.
 * Prefer clear state transitions over feature breadth.
+* Do not treat transcript/data-channel text as a substitute for tutor speech.
+* Do not use macOS `say` or local iOS TTS as the primary tutor voice path.
