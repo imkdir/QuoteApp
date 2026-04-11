@@ -17,6 +17,7 @@ struct QuoteTextView: View {
         .multilineTextAlignment(.leading)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 8)
+        .animation(.easeOut(duration: 0.14), value: spokenWordCount)
     }
 
     private var styledQuoteText: Text {
@@ -30,12 +31,16 @@ struct QuoteTextView: View {
     }
 
     private func styledText(for token: QuoteToken) -> Text {
-        let foregroundColor = token.isSpoken ? Color.primary : Color.secondary.opacity(0.6)
+        let foregroundColor = token.isSpoken ? Color.primary : Color.secondary.opacity(0.45)
         let underlineColor = token.isMarked ? Color.primary : Color.clear
 
         return Text(token.rawText)
             .foregroundColor(foregroundColor)
             .underline(token.isMarked, color: underlineColor)
+    }
+
+    private var spokenWordCount: Int {
+        tokens.filter { $0.isSpoken }.count
     }
 }
 

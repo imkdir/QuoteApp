@@ -123,6 +123,18 @@ struct PracticeService {
         }
     }
 
+    private struct TutorPlaybackCommandResponseDTO: Decodable {
+        let sessionID: String
+        let status: String
+        let message: String?
+
+        enum CodingKeys: String, CodingKey {
+            case sessionID = "session_id"
+            case status
+            case message
+        }
+    }
+
     let baseURL: URL
     let session: URLSession
 
@@ -198,6 +210,48 @@ struct PracticeService {
             )
         } catch let error as PracticeServiceError {
             throw error
+        } catch {
+            throw PracticeServiceError.decodingFailed
+        }
+    }
+
+    func requestTutorPlayback(sessionID: String) async throws {
+        let endpoint = baseURL
+            .appendingPathComponent("practice")
+            .appendingPathComponent("session")
+            .appendingPathComponent(sessionID)
+            .appendingPathComponent("tutor")
+            .appendingPathComponent("play")
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let data = try await perform(request: request)
+
+        do {
+            _ = try JSONDecoder().decode(TutorPlaybackCommandResponseDTO.self, from: data)
+        } catch {
+            throw PracticeServiceError.decodingFailed
+        }
+    }
+
+    func stopTutorPlayback(sessionID: String) async throws {
+        let endpoint = baseURL
+            .appendingPathComponent("practice")
+            .appendingPathComponent("session")
+            .appendingPathComponent(sessionID)
+            .appendingPathComponent("tutor")
+            .appendingPathComponent("stop")
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let data = try await perform(request: request)
+
+        do {
+            _ = try JSONDecoder().decode(TutorPlaybackCommandResponseDTO.self, from: data)
         } catch {
             throw PracticeServiceError.decodingFailed
         }

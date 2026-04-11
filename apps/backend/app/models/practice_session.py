@@ -3,9 +3,8 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel, Field
-
 from app.models.analysis_result import AnalysisState, TutorReviewResult
+from pydantic import BaseModel, Field
 
 
 class PracticeAttempt(BaseModel):
@@ -60,3 +59,11 @@ class SubmitPracticeAttemptResponse(BaseModel):
     attempt_id: str
     recording_reference: str
     state: AnalysisState
+
+
+class TutorPlaybackCommandResponse(BaseModel):
+    """Playback command acknowledgement for tutor audio control."""
+
+    session_id: str
+    status: str
+    message: Optional[str] = None

@@ -2,6 +2,8 @@ import Foundation
 
 protocol PracticeRepository {
     func startSession(quoteID: String, quoteText: String?) async throws -> PracticeSessionStart
+    func requestTutorPlayback(sessionID: String) async throws
+    func stopTutorPlayback(sessionID: String) async throws
     func submitAttempt(
         sessionID: String,
         recordingFileURL: URL,
@@ -15,6 +17,14 @@ struct PracticeRepositoryImpl: PracticeRepository {
 
     func startSession(quoteID: String, quoteText: String?) async throws -> PracticeSessionStart {
         try await practiceService.startSession(quoteID: quoteID, quoteText: quoteText)
+    }
+
+    func requestTutorPlayback(sessionID: String) async throws {
+        try await practiceService.requestTutorPlayback(sessionID: sessionID)
+    }
+
+    func stopTutorPlayback(sessionID: String) async throws {
+        try await practiceService.stopTutorPlayback(sessionID: sessionID)
     }
 
     func submitAttempt(

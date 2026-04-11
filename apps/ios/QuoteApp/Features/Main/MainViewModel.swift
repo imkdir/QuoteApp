@@ -18,9 +18,8 @@ final class MainViewModel: ObservableObject {
     @Published var sessionState: MainSessionState
     @Published var isQuotePickerPresented: Bool
     @Published var practiceStatusMessage: String
-    @Published var spokenTokenCount: Int
     @Published var feedbackSheetAnalysis: PracticeAnalysis?
-    @Published var tutorPlaybackState: TutorPlaybackState
+    @Published var tutorPlaybackState: PlaybackState
     @Published var quotes: [Quote]
     @Published var isLoadingQuotes: Bool
     @Published var quoteLoadingErrorMessage: String?
@@ -33,7 +32,7 @@ final class MainViewModel: ObservableObject {
     private let liveKitSessionManager: LiveKitSessionManager?
     private let audioSessionManager: AudioSessionManager?
     private let userRecordingManager: UserRecordingManager?
-    private let tutorPlaybackManager: TutorPlaybackManager?
+    private let tutorPlaybackManager: TutorPlaybackManager
 
     private var sessionStartTask: Task<String, Error>?
     private var resultPollingTask: Task<Void, Never>?
@@ -41,6 +40,8 @@ final class MainViewModel: ObservableObject {
     private var nextMockResultCursor: Int
     private let mockResultOrder: [AnalysisState] = [.info, .perfect, .unavailable]
     private let participantIdentity: String
+    private var lastObservedPlaybackState: PlaybackState
+    private var isTutorPlaybackCommandInFlight = false
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -54,9 +55,7 @@ final class MainViewModel: ObservableObject {
         tutorPlaybackManager: TutorPlaybackManager? = nil,
         sessionState: MainSessionState = .start,
         isQuotePickerPresented: Bool = false,
-        spokenTokenCount: Int = 0,
         feedbackSheetAnalysis: PracticeAnalysis? = nil,
-        tutorPlaybackState: TutorPlaybackState = .pausedOrFinished,
         isLoadingQuotes: Bool = false,
         quoteLoadingErrorMessage: String? = nil,
         nextMockResultCursor: Int = 0,
@@ -69,28 +68,39 @@ final class MainViewModel: ObservableObject {
         self.liveKitSessionManager = liveKitSessionManager
         self.audioSessionManager = audioSessionManager
         self.userRecordingManager = userRecordingManager
-        self.tutorPlaybackManager = tutorPlaybackManager
+        self.tutorPlaybackManager = tutorPlaybackManager ?? TutorPlaybackManager()
         self.sessionState = sessionState
         self.isQuotePickerPresented = isQuotePickerPresented
-        self.practiceStatusMessage = "Tap Repeat to advance spoken words."
-        self.spokenTokenCount = spokenTokenCount
+        self.practiceStatusMessage = "All words are dimmed. Tap Play to hear the tutor."
         self.feedbackSheetAnalysis = feedbackSheetAnalysis
-        self.tutorPlaybackState = tutorPlaybackState
+        self.tutorPlaybackState = self.tutorPlaybackManager.playbackState
         self.isLoadingQuotes = isLoadingQuotes
         self.quoteLoadingErrorMessage = quoteLoadingErrorMessage
         self.nextMockResultCursor = nextMockResultCursor
         self.participantIdentity = participantIdentity
+        self.lastObservedPlaybackState = self.tutorPlaybackManager.playbackState
         self.liveKitConnectionState = liveKitSessionManager?.connectionState ?? .disconnected
         self.recordingWaveformLevels = userRecordingManager?.meterLevels ?? Self.defaultWaveformLevels
 
+        let initialWordCount = sessionState.selectedQuoteWordCount
+        let initialQuoteText = sessionState.selectedQuote?.fullText
+        self.tutorPlaybackManager.prepareForQuote(
+            wordCount: initialWordCount,
+            quoteText: initialQuoteText
+        )
+        self.tutorPlaybackState = self.tutorPlaybackManager.playbackState
+        self.lastObservedPlaybackState = self.tutorPlaybackState
+
+        bindTutorPlaybackState()
         bindLiveKitState()
+        bindTutorPlaybackEvents()
         bindRecordingState()
     }
 
     var actionToolbarState: ActionToolbarState {
         guard let session = sessionState.practiceSession else {
             return ActionToolbarState(
-                tutorPlaybackState: tutorPlaybackState,
+                playbackState: tutorPlaybackState,
                 localRecordingDraftState: nil,
                 latestAttemptReviewState: .none,
                 hasAttemptHistory: false
@@ -98,7 +108,7 @@ final class MainViewModel: ObservableObject {
         }
 
         return ActionToolbarState(
-            tutorPlaybackState: tutorPlaybackState,
+            playbackState: tutorPlaybackState,
             localRecordingDraftState: session.localRecordingDraft?.state,
             latestAttemptReviewState: latestAttemptReviewState,
             hasAttemptHistory: latestAnalysis != nil
@@ -151,7 +161,8 @@ final class MainViewModel: ObservableObject {
             return []
         }
 
-        let baseTokens = selectedQuote.makeTokens(spokenCount: spokenTokenCount, markedTokenIndexes: [])
+        let spokenWordCount = tutorPlaybackState.spokenWordCount
+        let baseTokens = selectedQuote.makeTokens(spokenCount: spokenWordCount, markedTokenIndexes: [])
         let markedWordSet = Set(markedWordsFromLatestAnalysis)
 
         let markedIndexes = Set(
@@ -160,7 +171,7 @@ final class MainViewModel: ObservableObject {
                 .map(\.index)
         )
 
-        return selectedQuote.makeTokens(spokenCount: spokenTokenCount, markedTokenIndexes: markedIndexes)
+        return selectedQuote.makeTokens(spokenCount: spokenWordCount, markedTokenIndexes: markedIndexes)
     }
 
     var liveKitStatusText: String {
@@ -201,6 +212,9 @@ final class MainViewModel: ObservableObject {
     }
 
     func selectQuote(_ quote: Quote) {
+        let previousSessionID = sessionState.practiceSession?.backendSessionID
+        let shouldStopPreviousTutorPlayback = tutorPlaybackState.isPlaying
+
         sessionStartTask?.cancel()
         sessionStartTask = nil
         resultPollingTask?.cancel()
@@ -209,12 +223,24 @@ final class MainViewModel: ObservableObject {
 
         sessionState = .practice(PracticeSession(quote: quote))
         isQuotePickerPresented = false
-        spokenTokenCount = 0
-        tutorPlaybackState = .pausedOrFinished
+        tutorPlaybackManager.prepareForQuote(
+            wordCount: quote.wordCount,
+            quoteText: quote.fullText
+        )
+        tutorPlaybackState = tutorPlaybackManager.playbackState
         feedbackSheetAnalysis = nil
         userRecordingManager?.clearRecording()
         recordingWaveformLevels = userRecordingManager?.meterLevels ?? Self.defaultWaveformLevels
-        practiceStatusMessage = "All words are dimmed. Tap Repeat to mock playback."
+        practiceStatusMessage = "All words are dimmed. Tap Play to hear the tutor."
+
+        if shouldStopPreviousTutorPlayback {
+            Task { [weak self] in
+                guard let self else {
+                    return
+                }
+                await self.stopTutorPlaybackForSessionIfPossible(previousSessionID)
+            }
+        }
 
         guard practiceRepository != nil else {
             return
@@ -285,17 +311,11 @@ final class MainViewModel: ObservableObject {
     }
 
     func playbackTapped() {
-        guard sessionState.isPractice else {
+        guard let selectedQuote = sessionState.selectedQuote else {
             return
         }
 
         guard sessionState.practiceSession?.localRecordingDraft == nil else {
-            return
-        }
-
-        if tutorPlaybackState == .speaking {
-            tutorPlaybackState = .pausedOrFinished
-            practiceStatusMessage = "Playback paused (mock)."
             return
         }
 
@@ -304,12 +324,47 @@ final class MainViewModel: ObservableObject {
                 return
             }
 
-            if let quote = self.sessionState.selectedQuote {
-                await self.connectLiveKitForSelectedQuoteIfNeeded(quote)
+            guard !self.isTutorPlaybackCommandInFlight else {
+                return
             }
 
-            self.tutorPlaybackState = .speaking
-            self.advanceSpokenProgress()
+            await self.connectLiveKitForSelectedQuoteIfNeeded(selectedQuote)
+            guard self.sessionState.selectedQuote?.id == selectedQuote.id else {
+                return
+            }
+
+            switch self.tutorPlaybackState {
+            case .playing:
+                self.isTutorPlaybackCommandInFlight = true
+                await self.setTutorAudioPlaybackEnabled(false)
+                self.tutorPlaybackManager.pauseFromBackendStop()
+                self.tutorPlaybackState = self.tutorPlaybackManager.playbackState
+                await self.stopTutorPlaybackForSessionIfPossible(self.currentBackendSessionID)
+                self.practiceStatusMessage = "Tutor playback paused."
+                self.isTutorPlaybackCommandInFlight = false
+
+            case .idle, .paused, .finishedAtEnd:
+                guard let practiceRepository else {
+                    self.tutorPlaybackManager.beginLocalDevelopmentFallbackPlayback(
+                        wordCount: selectedQuote.wordCount
+                    )
+                    self.practiceStatusMessage =
+                        "Development fallback: local quote timing is active (no backend tutor audio)."
+                    return
+                }
+
+                do {
+                    self.isTutorPlaybackCommandInFlight = true
+                    let sessionID = try await self.ensurePracticeSessionID(for: selectedQuote)
+                    await self.setTutorAudioPlaybackEnabled(true)
+                    try await practiceRepository.requestTutorPlayback(sessionID: sessionID)
+                    self.practiceStatusMessage = "Tutor playback requested."
+                    self.isTutorPlaybackCommandInFlight = false
+                } catch {
+                    self.practiceStatusMessage = "Could not start tutor playback from backend."
+                    self.isTutorPlaybackCommandInFlight = false
+                }
+            }
         }
     }
 
@@ -320,7 +375,16 @@ final class MainViewModel: ObservableObject {
 
         supersedeActiveLoadingAttemptForUI()
         feedbackSheetAnalysis = nil
-        tutorPlaybackState = .pausedOrFinished
+        tutorPlaybackManager.forceStopForRecording()
+        tutorPlaybackState = tutorPlaybackManager.playbackState
+
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+            await self.setTutorAudioPlaybackEnabled(false)
+            await self.stopTutorPlaybackForSessionIfPossible(self.currentBackendSessionID)
+        }
 
         guard let userRecordingManager else {
             let reference = "local-draft-\(Int(Date().timeIntervalSince1970))"
@@ -563,21 +627,6 @@ final class MainViewModel: ObservableObject {
         return latestAnalysis.markedNormalizedTokens
     }
 
-    private func advanceSpokenProgress() {
-        guard let selectedQuote = sessionState.selectedQuote else {
-            return
-        }
-
-        spokenTokenCount = min(spokenTokenCount + 3, selectedQuote.wordCount)
-
-        if spokenTokenCount >= selectedQuote.wordCount {
-            tutorPlaybackState = .pausedOrFinished
-            practiceStatusMessage = "Playback finished (mock)."
-        } else {
-            practiceStatusMessage = "Tutor speaking mock advanced to word \(spokenTokenCount)."
-        }
-    }
-
     private func resolveMockAnalysis(for attemptID: UUID) {
         guard let quote = sessionState.selectedQuote else {
             return
@@ -643,6 +692,27 @@ final class MainViewModel: ObservableObject {
         }
     }
 
+    private func bindTutorPlaybackState() {
+        tutorPlaybackManager.$playbackState
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                guard let self else {
+                    return
+                }
+
+                let previousState = self.lastObservedPlaybackState
+                self.lastObservedPlaybackState = state
+                self.tutorPlaybackState = state
+
+                if previousState.isPlaying,
+                   state.isFinishedAtEnd,
+                   self.sessionState.practiceSession?.localRecordingDraft == nil {
+                    self.practiceStatusMessage = "Tutor playback finished."
+                }
+            }
+            .store(in: &cancellables)
+    }
+
     private func bindLiveKitState() {
         guard let liveKitSessionManager else {
             return
@@ -655,7 +725,20 @@ final class MainViewModel: ObservableObject {
                     return
                 }
                 self.liveKitConnectionState = state
-                self.tutorPlaybackManager?.applyLiveKitConnectionState(state)
+                self.tutorPlaybackManager.applyLiveKitConnectionState(state)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func bindTutorPlaybackEvents() {
+        guard let liveKitSessionManager else {
+            return
+        }
+
+        liveKitSessionManager.tutorPlaybackEvents
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                self?.handleTutorPlaybackEvent(event)
             }
             .store(in: &cancellables)
     }
@@ -678,8 +761,7 @@ final class MainViewModel: ObservableObject {
             let sessionID = try await ensurePracticeSessionID(for: quote)
             await connectLiveKitIfNeeded(for: quote, sessionID: sessionID)
         } catch {
-            // Keep playback mock flow unblocked while surfacing the connection issue.
-            practiceStatusMessage = "LiveKit connection failed. Playback remains mocked."
+            practiceStatusMessage = "LiveKit connection failed. Tutor playback may be unavailable."
         }
     }
 
@@ -691,7 +773,11 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        if case .connected = liveKitConnectionState {
+        let roomName = makeLiveKitRoomName(quoteID: quote.id, sessionID: sessionID)
+
+        if case let .connected(activeRoom, _) = liveKitConnectionState,
+           activeRoom == roomName {
+            await liveKitSessionManager.setTutorAudioPlaybackEnabled(true)
             return
         }
 
@@ -701,12 +787,12 @@ final class MainViewModel: ObservableObject {
             practiceStatusMessage = "Audio setup failed. LiveKit connection may fail."
         }
 
-        let roomName = makeLiveKitRoomName(quoteID: quote.id, sessionID: sessionID)
         await liveKitSessionManager.connect(
             identity: participantIdentity,
             roomName: roomName,
             displayName: "QuoteApp Learner"
         )
+        await liveKitSessionManager.setTutorAudioPlaybackEnabled(true)
     }
 
     private func makeLiveKitRoomName(quoteID: String, sessionID: String) -> String {
@@ -714,6 +800,79 @@ final class MainViewModel: ObservableObject {
         let allowed = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
         let sanitized = String(raw.filter { allowed.contains($0) })
         return sanitized.isEmpty ? "practice-default" : sanitized
+    }
+
+    private var currentBackendSessionID: String? {
+        sessionState.practiceSession?.backendSessionID
+    }
+
+    private func handleTutorPlaybackEvent(_ event: TutorPlaybackEvent) {
+        switch event {
+        case let .started(sessionID, wordCount, estimatedDurationSeconds):
+            guard matchesCurrentSession(eventSessionID: sessionID) else {
+                return
+            }
+
+            let quoteWordCount = sessionState.selectedQuoteWordCount
+            let totalWordCount = quoteWordCount > 0 ? quoteWordCount : wordCount
+            tutorPlaybackManager.beginPlaybackFromBackendStart(
+                wordCount: totalWordCount,
+                estimatedDurationSeconds: estimatedDurationSeconds
+            )
+            practiceStatusMessage = "Tutor playback is active."
+
+        case let .finished(sessionID):
+            guard matchesCurrentSession(eventSessionID: sessionID) else {
+                return
+            }
+
+            tutorPlaybackManager.markFinishedAtEndFromBackend()
+            if sessionState.practiceSession?.localRecordingDraft == nil {
+                practiceStatusMessage = "Tutor playback finished."
+            }
+
+        case let .stopped(sessionID):
+            guard matchesCurrentSession(eventSessionID: sessionID) else {
+                return
+            }
+
+            tutorPlaybackManager.markStoppedFromBackend()
+            if sessionState.practiceSession?.localRecordingDraft == nil {
+                practiceStatusMessage = "Tutor playback paused."
+            }
+        }
+    }
+
+    private func matchesCurrentSession(eventSessionID: String?) -> Bool {
+        guard let eventSessionID else {
+            return true
+        }
+
+        guard let currentBackendSessionID else {
+            return false
+        }
+
+        return eventSessionID == currentBackendSessionID
+    }
+
+    private func stopTutorPlaybackForSessionIfPossible(_ sessionID: String?) async {
+        guard let sessionID, let practiceRepository else {
+            return
+        }
+
+        do {
+            try await practiceRepository.stopTutorPlayback(sessionID: sessionID)
+        } catch {
+            return
+        }
+    }
+
+    private func setTutorAudioPlaybackEnabled(_ enabled: Bool) async {
+        guard let liveKitSessionManager else {
+            return
+        }
+
+        await liveKitSessionManager.setTutorAudioPlaybackEnabled(enabled)
     }
 
     private func applyBackendResult(
@@ -907,14 +1066,19 @@ extension MainViewModel {
         }
 
         viewModel.sessionState = .practice(PracticeSession(quote: quote))
-        viewModel.tutorPlaybackState = .speaking
-        viewModel.practiceStatusMessage = "Tutor speaking mock is active."
+        viewModel.tutorPlaybackState = .playing(
+            progress: PlaybackProgress(spokenWordCount: 9, totalWordCount: quote.wordCount)
+        )
+        viewModel.practiceStatusMessage = "Tutor playback is active."
         return viewModel
     }
 
     static var previewSpeakingWithOlderHistory: MainViewModel {
         let viewModel = makeLatestReviewPreview(state: .info, presentSheet: false)
-        viewModel.tutorPlaybackState = .speaking
+        let totalWordCount = viewModel.sessionState.selectedQuoteWordCount
+        viewModel.tutorPlaybackState = .playing(
+            progress: PlaybackProgress(spokenWordCount: 7, totalWordCount: totalWordCount)
+        )
         viewModel.practiceStatusMessage = "Speaking while older attempt history exists."
         return viewModel
     }
@@ -979,7 +1143,9 @@ extension MainViewModel {
             )
         )
 
-        viewModel.tutorPlaybackState = .pausedOrFinished
+        viewModel.tutorPlaybackState = .finishedAtEnd(
+            progress: PlaybackProgress(spokenWordCount: quote.wordCount, totalWordCount: quote.wordCount)
+        )
         viewModel.practiceStatusMessage = previewStatusMessage(for: state)
 
         if state == .loading {

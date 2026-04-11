@@ -1,10 +1,5 @@
 import Foundation
 
-enum TutorPlaybackState: Equatable {
-    case speaking
-    case pausedOrFinished
-}
-
 enum LatestAttemptReviewState: Equatable {
     case none
     case loading
@@ -14,7 +9,7 @@ enum LatestAttemptReviewState: Equatable {
 }
 
 struct ActionToolbarState: Equatable {
-    let tutorPlaybackState: TutorPlaybackState
+    let playbackState: PlaybackState
     let localRecordingDraftState: LocalRecordingDraftState?
     let latestAttemptReviewState: LatestAttemptReviewState
     let hasAttemptHistory: Bool
@@ -28,11 +23,11 @@ struct ActionToolbarState: Equatable {
             return nil
         }
 
-        switch tutorPlaybackState {
-        case .speaking:
+        switch playbackState {
+        case .playing:
             return .pause
-        case .pausedOrFinished:
-            return .repeat
+        case .idle, .paused, .finishedAtEnd:
+            return .playRepeat
         }
     }
 

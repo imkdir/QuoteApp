@@ -3,14 +3,14 @@ import SwiftUI
 struct PlaybackActionButton: View {
     enum Mode: Equatable {
         case pause
-        case `repeat`
+        case playRepeat
 
         var title: String {
             switch self {
             case .pause:
                 return "Pause"
-            case .repeat:
-                return "Repeat"
+            case .playRepeat:
+                return "Play"
             }
         }
 
@@ -18,7 +18,7 @@ struct PlaybackActionButton: View {
             switch self {
             case .pause:
                 return "pause.circle.fill"
-            case .repeat:
+            case .playRepeat:
                 return "play.circle.fill"
             }
         }
@@ -37,7 +37,7 @@ struct PlaybackActionButton: View {
         .tint(.gray.opacity(0.2))
         .foregroundStyle(.blue)
         .accessibilityLabel(mode.title)
-        .accessibilityHint(mode == .pause ? "Pauses tutor playback" : "Restarts tutor playback")
+        .accessibilityHint(mode == .pause ? "Pauses tutor playback" : "Starts, resumes, or repeats tutor playback")
     }
 }
 
@@ -49,9 +49,9 @@ struct PlaybackActionButton_Previews: PreviewProvider {
                 .padding()
                 .previewDisplayName("Pause")
 
-            PlaybackActionButton(mode: .repeat, action: {})
+            PlaybackActionButton(mode: .playRepeat, action: {})
                 .padding()
-                .previewDisplayName("Repeat")
+                .previewDisplayName("Play/Repeat")
         }
     }
 }

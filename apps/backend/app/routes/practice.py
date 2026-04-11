@@ -9,6 +9,7 @@ from app.models.practice_session import (
     StartPracticeSessionRequest,
     StartPracticeSessionResponse,
     SubmitPracticeAttemptResponse,
+    TutorPlaybackCommandResponse,
 )
 from app.config import get_settings
 from app.services.practice_service import (
@@ -175,4 +176,68 @@ def submit_learner_attempt(
         attempt_id=attempt.attempt_id,
         recording_reference=attempt.recording_reference,
         state=attempt.review_result.state if attempt.review_result else AnalysisState.loading,
+    )
+
+
+@router.post(
+    "/session/{session_id}/tutor/play",
+    response_model=TutorPlaybackCommandResponse,
+)
+def play_tutor_quote(session_id: str) -> TutorPlaybackCommandResponse:
+    """Triggers backend tutor playback as room audio for the selected session quote."""
+
+    settings = get_settings()
+    context = _TUTOR_RUNTIME.context_for_session(session_id)
+    if context is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "session_not_found",
+                "message": f"Session not found: {session_id}",
+            },
+        )
+
+    try:
+        _TUTOR_RUNTIME.request_quote_playback(session_id=session_id, settings=settings)
+        _sync_tutor_status(session_id)
+    except Exception as exc:  # noqa: BLE001 - runtime boundary
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "code": "tutor_playback_failed",
+                "message": str(exc),
+            },
+        ) from exc
+
+    return TutorPlaybackCommandResponse(
+        session_id=session_id,
+        status="playing",
+        message="Tutor playback requested.",
+    )
+
+
+@router.post(
+    "/session/{session_id}/tutor/stop",
+    response_model=TutorPlaybackCommandResponse,
+)
+def stop_tutor_quote(session_id: str) -> TutorPlaybackCommandResponse:
+    """Stops active backend tutor playback for the session, if any."""
+
+    context = _TUTOR_RUNTIME.context_for_session(session_id)
+    if context is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "session_not_found",
+                "message": f"Session not found: {session_id}",
+            },
+        )
+
+    _TUTOR_RUNTIME.stop_quote_playback(session_id=session_id)
+    _sync_tutor_status(session_id)
+
+    return TutorPlaybackCommandResponse(
+        session_id=session_id,
+        status="stopped",
+        message="Tutor playback stop requested.",
     )

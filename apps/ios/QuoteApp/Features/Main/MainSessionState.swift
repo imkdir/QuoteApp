@@ -65,6 +65,10 @@ struct PracticeSession: Equatable {
     var hasLocalRecordingDraft: Bool {
         localRecordingDraft != nil
     }
+
+    var quoteWordCount: Int {
+        quote.wordCount
+    }
 }
 
 enum MainSessionState: Equatable {
@@ -73,6 +77,10 @@ enum MainSessionState: Equatable {
 
     var selectedQuote: Quote? {
         practiceSession?.quote
+    }
+
+    var selectedQuoteWordCount: Int {
+        selectedQuote?.wordCount ?? 0
     }
 
     var isPractice: Bool {

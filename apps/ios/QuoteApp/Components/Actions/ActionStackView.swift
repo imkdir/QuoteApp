@@ -91,7 +91,9 @@ struct ActionStackView_Previews: PreviewProvider {
         Group {
             preview(
                 toolbarState: ActionToolbarState(
-                    tutorPlaybackState: .speaking,
+                    playbackState: .playing(
+                        progress: PlaybackProgress(spokenWordCount: 7, totalWordCount: 24)
+                    ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .none,
                     hasAttemptHistory: false
@@ -100,7 +102,9 @@ struct ActionStackView_Previews: PreviewProvider {
             )
             preview(
                 toolbarState: ActionToolbarState(
-                    tutorPlaybackState: .speaking,
+                    playbackState: .playing(
+                        progress: PlaybackProgress(spokenWordCount: 10, totalWordCount: 24)
+                    ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .info,
                     hasAttemptHistory: true
@@ -109,7 +113,9 @@ struct ActionStackView_Previews: PreviewProvider {
             )
             preview(
                 toolbarState: ActionToolbarState(
-                    tutorPlaybackState: .pausedOrFinished,
+                    playbackState: .paused(
+                        progress: PlaybackProgress(spokenWordCount: 9, totalWordCount: 24)
+                    ),
                     localRecordingDraftState: .recording,
                     latestAttemptReviewState: .info,
                     hasAttemptHistory: true
@@ -118,7 +124,9 @@ struct ActionStackView_Previews: PreviewProvider {
             )
             preview(
                 toolbarState: ActionToolbarState(
-                    tutorPlaybackState: .pausedOrFinished,
+                    playbackState: .paused(
+                        progress: PlaybackProgress(spokenWordCount: 9, totalWordCount: 24)
+                    ),
                     localRecordingDraftState: .stopped,
                     latestAttemptReviewState: .info,
                     hasAttemptHistory: true
@@ -127,7 +135,9 @@ struct ActionStackView_Previews: PreviewProvider {
             )
             preview(
                 toolbarState: ActionToolbarState(
-                    tutorPlaybackState: .pausedOrFinished,
+                    playbackState: .paused(
+                        progress: PlaybackProgress(spokenWordCount: 8, totalWordCount: 24)
+                    ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .loading,
                     hasAttemptHistory: true
@@ -136,7 +146,9 @@ struct ActionStackView_Previews: PreviewProvider {
             )
             preview(
                 toolbarState: ActionToolbarState(
-                    tutorPlaybackState: .pausedOrFinished,
+                    playbackState: .paused(
+                        progress: PlaybackProgress(spokenWordCount: 12, totalWordCount: 24)
+                    ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .info,
                     hasAttemptHistory: true
@@ -145,7 +157,9 @@ struct ActionStackView_Previews: PreviewProvider {
             )
             preview(
                 toolbarState: ActionToolbarState(
-                    tutorPlaybackState: .pausedOrFinished,
+                    playbackState: .finishedAtEnd(
+                        progress: PlaybackProgress(spokenWordCount: 24, totalWordCount: 24)
+                    ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .perfect,
                     hasAttemptHistory: true
@@ -154,7 +168,9 @@ struct ActionStackView_Previews: PreviewProvider {
             )
             preview(
                 toolbarState: ActionToolbarState(
-                    tutorPlaybackState: .pausedOrFinished,
+                    playbackState: .finishedAtEnd(
+                        progress: PlaybackProgress(spokenWordCount: 24, totalWordCount: 24)
+                    ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .unavailable,
                     hasAttemptHistory: true
