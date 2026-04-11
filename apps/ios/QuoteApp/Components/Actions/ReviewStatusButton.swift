@@ -5,6 +5,7 @@ struct ReviewStatusButton: View {
         case reviewing
         case reviewedInfo
         case reviewedPerfect
+        case reviewedNone
         case unavailable
 
         var title: String {
@@ -17,25 +18,29 @@ struct ReviewStatusButton: View {
                 return "Reviewed Perfect"
             case .unavailable:
                 return "Unavailable"
+            case .reviewedNone:
+                return "Reviewed None"
             }
         }
 
         var systemImage: String {
             switch self {
             case .reviewing:
-                return "ellipsis.message.fill"
+                return "message.badge.waveform.fill"
             case .reviewedInfo:
-                return "message.badge.filled.fill"
+                return "ellipsis.message.fill"
             case .reviewedPerfect:
                 return "checkmark.message.fill"
             case .unavailable:
                 return "exclamationmark.message.fill"
+            case .reviewedNone:
+                return "message.fill"
             }
         }
 
         var isTappable: Bool {
             switch self {
-            case .reviewing:
+            case .reviewing, .reviewedNone:
                 return false
             default:
                 return true
@@ -52,10 +57,7 @@ struct ReviewStatusButton: View {
                 .font(.title3.weight(.semibold))
                 .frame(width: 44, height: 44)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(.gray.opacity(state == .reviewing ? 0.15 : 0.2))
         .foregroundStyle(iconForegroundColor)
-        .opacity(state == .reviewing ? 0.72 : 1.0)
         .disabled(!state.isTappable)
         .accessibilityLabel(state.title)
         .accessibilityHint(accessibilityHint)
@@ -67,8 +69,8 @@ struct ReviewStatusButton: View {
             return .orange
         case .reviewedPerfect:
             return .green
-        case .reviewing:
-            return .secondary
+        case .reviewedNone:
+            return Color(uiColor: .systemGray4)
         default:
             return .blue
         }
@@ -80,6 +82,8 @@ struct ReviewStatusButton: View {
             return "Review is in progress"
         case .reviewedInfo, .reviewedPerfect, .unavailable:
             return "Opens review details"
+        case .reviewedNone:
+            return "Nothing reviewed yet"
         }
     }
 

@@ -16,7 +16,7 @@ struct RecordingWaveformField: View {
                     .opacity(isRecording ? 0.35 + (Double(shapedLevel) * 0.6) : 0.45)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 32, maxHeight: 32, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 32, maxHeight: 32)
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))

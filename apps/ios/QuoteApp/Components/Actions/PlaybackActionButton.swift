@@ -48,8 +48,6 @@ struct PlaybackActionButton: View {
                 .font(.title3.weight(.semibold))
                 .frame(width: 44, height: 44)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(.gray.opacity(0.2))
         .foregroundStyle(.blue)
         .disabled(isDisabled)
         .accessibilityLabel(mode.title)

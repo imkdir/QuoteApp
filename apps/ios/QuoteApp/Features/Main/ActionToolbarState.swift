@@ -35,18 +35,18 @@ struct ActionToolbarState: Equatable {
         }
     }
 
-    var reviewState: ReviewStatusButton.State? {
+    var reviewState: ReviewStatusButton.State {
         guard !isInRecordingExclusiveMode else {
-            return nil
+            return .reviewedNone
         }
 
         guard hasVisibleReviewState else {
-            return nil
+            return .reviewedNone
         }
 
         switch latestAttemptReviewState {
         case .none:
-            return nil
+            return .reviewedNone
         case .loading:
             return .reviewing
         case .info:

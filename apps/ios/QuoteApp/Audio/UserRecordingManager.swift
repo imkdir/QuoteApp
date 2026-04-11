@@ -31,7 +31,7 @@ final class UserRecordingManager: NSObject, ObservableObject {
     private var audioRecorder: AVAudioRecorder?
     private var meterTimer: Timer?
     private var smoothedMeterLevel: CGFloat = 0
-    private static let meterBarCount = 16
+    private static let meterBarCount = 24
     private static let meterSampleInterval: TimeInterval = 1.0 / 30.0
     private static let defaultMeterLevels = Array(repeating: CGFloat(0.08), count: meterBarCount)
     private static let minimumDisplayLevel: CGFloat = 0.03

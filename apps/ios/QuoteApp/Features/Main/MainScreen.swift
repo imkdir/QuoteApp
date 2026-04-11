@@ -53,29 +53,7 @@ struct MainScreen: View {
 
     private func practiceView(quote: Quote) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-
             QuoteTextView(tokens: viewModel.currentQuoteTokens)
-
-            Spacer(minLength: 20)
-
-            ActionStackView(
-                toolbarState: viewModel.actionToolbarState,
-                isPlaybackButtonDisabled: viewModel.isTutorAudioDownloadInFlight,
-                recordingWaveformLevels: viewModel.recordingWaveformLevels,
-                onPlaybackTapped: viewModel.playbackTapped,
-                onRecordTapped: viewModel.recordTapped,
-                onStopRecordingTapped: viewModel.stopRecordingTapped,
-                onCloseRecordingTapped: viewModel.closeRecordingTapped,
-                onSendTapped: viewModel.sendTapped,
-                onReviewTapped: viewModel.reviewTapped
-            )
-
-            #if targetEnvironment(simulator)
-            Text(viewModel.practiceStatusMessage)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .center)
-            #endif
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -86,6 +64,19 @@ struct MainScreen: View {
             }
             ToolbarItem(placement: .principal) {
                 Image(systemName: viewModel.liveKitStatusSymbol)
+            }
+            ToolbarItemGroup(placement: .bottomBar) {
+                ActionStackView(
+                    toolbarState: viewModel.actionToolbarState,
+                    isPlaybackButtonDisabled: viewModel.isTutorAudioDownloadInFlight,
+                    recordingWaveformLevels: viewModel.recordingWaveformLevels,
+                    onPlaybackTapped: viewModel.playbackTapped,
+                    onRecordTapped: viewModel.recordTapped,
+                    onStopRecordingTapped: viewModel.stopRecordingTapped,
+                    onCloseRecordingTapped: viewModel.closeRecordingTapped,
+                    onSendTapped: viewModel.sendTapped,
+                    onReviewTapped: viewModel.reviewTapped
+                )
             }
         }
     }

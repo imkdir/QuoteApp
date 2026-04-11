@@ -22,7 +22,7 @@ struct ActionStackView: View {
     }
 
     private var standardLayout: some View {
-        HStack(alignment: .center, spacing: 12) {
+        Group {
             if let playbackMode = toolbarState.playbackMode {
                 PlaybackActionButton(
                     mode: playbackMode,
@@ -36,36 +36,26 @@ struct ActionStackView: View {
             }
 
             if toolbarState.showsReviewButton {
-                analysisGroup
+                ReviewStatusButton(state: toolbarState.reviewState, action: onReviewTapped)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .center)
         .animation(.easeInOut(duration: 0.15), value: toolbarState)
     }
 
     private var recordingFlowLayout: some View {
-        HStack(alignment: .center, spacing: 10) {
+        Group {
             RecordingInputToolbar(
                 state: toolbarState.recordingToolbarState,
                 waveformLevels: recordingWaveformLevels,
                 onStop: onStopRecordingTapped,
                 onClose: onCloseRecordingTapped
             )
-            .frame(maxWidth: .infinity, alignment: .leading)
 
             if toolbarState.showsSendButton {
                 sendButton
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.easeInOut(duration: 0.15), value: toolbarState)
-    }
-
-    @ViewBuilder
-    private var analysisGroup: some View {
-        if let reviewState = toolbarState.reviewState {
-            ReviewStatusButton(state: reviewState, action: onReviewTapped)
-        }
     }
 
     private var recordButton: some View {
