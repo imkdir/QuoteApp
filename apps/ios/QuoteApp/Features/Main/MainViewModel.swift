@@ -279,6 +279,7 @@ final class MainViewModel: ObservableObject {
                 guard self.sessionState.selectedQuote?.id == quote.id else {
                     return
                 }
+                self.refreshLiveAPIStatusAfterRequestError(error)
                 self.practiceStatusMessage = "Could not start practice session. Review may be unavailable."
             }
         }
@@ -322,6 +323,7 @@ final class MainViewModel: ObservableObject {
                 quotes = backendQuotes
                 quoteLoadingErrorMessage = nil
             } catch {
+                refreshLiveAPIStatusAfterRequestError(error)
                 quoteLoadingErrorMessage = "Could not load quotes. Check backend and retry."
             }
 
@@ -388,6 +390,10 @@ final class MainViewModel: ObservableObject {
                     guard self.sessionState.selectedQuote?.id == selectedQuote.id else {
                         return
                     }
+                    await self.startLiveKitSetupIfStatusFailed(
+                        for: selectedQuote,
+                        sessionID: sessionID
+                    )
 
                     let playbackIdentity = self.sessionState.practiceSession?.tutorPlaybackIdentity
                     if let playbackIdentity,
@@ -409,9 +415,22 @@ final class MainViewModel: ObservableObject {
                     }
 
                     self.isTutorAudioDownloadInFlight = true
-                    let artifact = try await practiceRepository.fetchTutorPlaybackAudioArtifact(
-                        sessionID: sessionID
-                    )
+                    let artifact: TutorPlaybackAudioArtifact
+                    do {
+                        artifact = try await practiceRepository.fetchTutorPlaybackAudioArtifact(
+                            sessionID: sessionID
+                        )
+                    } catch {
+                        guard self.isSessionExpiredError(error) else {
+                            throw error
+                        }
+                        let recoveredSessionID = try await self.restartBackendSessionAndReconnect(
+                            for: selectedQuote
+                        )
+                        artifact = try await practiceRepository.fetchTutorPlaybackAudioArtifact(
+                            sessionID: recoveredSessionID
+                        )
+                    }
                     self.isTutorAudioDownloadInFlight = false
                     let cachedFileURL = try self.tutorAudioCache.storeAudioArtifact(
                         data: artifact.audioData,
@@ -436,6 +455,7 @@ final class MainViewModel: ObservableObject {
                         ? "Tutor playback restarting from the beginning."
                         : "Tutor playback started."
                 } catch {
+                    self.refreshLiveAPIStatusAfterRequestError(error)
                     let fallbackStarted = await self.startTutorPlaybackViaLiveKitFallback(
                         for: selectedQuote,
                         playbackStateBeforeCommand: playbackStateBeforeCommand
@@ -611,11 +631,30 @@ final class MainViewModel: ObservableObject {
 
             do {
                 let sessionID = try await self.ensurePracticeSessionID(for: selectedQuote)
-                let submission = try await practiceRepository.submitAttempt(
-                    sessionID: sessionID,
-                    recordingFileURL: draftFileURL,
-                    originalRecordingReference: draftRecordingReference
+                await self.startLiveKitSetupIfStatusFailed(
+                    for: selectedQuote,
+                    sessionID: sessionID
                 )
+                let submission: PracticeAttemptSubmission
+                do {
+                    submission = try await practiceRepository.submitAttempt(
+                        sessionID: sessionID,
+                        recordingFileURL: draftFileURL,
+                        originalRecordingReference: draftRecordingReference
+                    )
+                } catch {
+                    guard self.isSessionExpiredError(error) else {
+                        throw error
+                    }
+                    let recoveredSessionID = try await self.restartBackendSessionAndReconnect(
+                        for: selectedQuote
+                    )
+                    submission = try await practiceRepository.submitAttempt(
+                        sessionID: recoveredSessionID,
+                        recordingFileURL: draftFileURL,
+                        originalRecordingReference: draftRecordingReference
+                    )
+                }
                 self.updateAttemptSubmissionMetadata(
                     forAttemptID: attemptID,
                     backendAttemptID: submission.attemptID,
@@ -640,13 +679,16 @@ final class MainViewModel: ObservableObject {
 
                 self.userRecordingManager?.clearRecording()
                 let latestResult = try await analysisPollingService.pollLatestResult(
-                    sessionID: sessionID,
+                    sessionID: submission.sessionID,
                     repository: practiceRepository
                 )
                 self.applyBackendResult(latestResult, toLocalAttemptID: attemptID)
             } catch is CancellationError {
                 return
             } catch AnalysisPollingService.PollingError.timedOut {
+                self.refreshLiveAPIStatusAfterRequestError(
+                    AnalysisPollingService.PollingError.timedOut
+                )
                 self.applyUnavailableResult(
                     toLocalAttemptID: attemptID,
                     message: "Review timed out for this attempt."
@@ -680,6 +722,7 @@ final class MainViewModel: ObservableObject {
                     toLocalAttemptID: attemptID,
                     message: message
                 )
+                self.refreshLiveAPIStatusAfterRequestError(error)
                 self.userRecordingManager?.clearRecording()
             }
         }
@@ -841,7 +884,17 @@ final class MainViewModel: ObservableObject {
             await setTutorAudioPlaybackEnabled(true)
             pendingTutorPlaybackRequestedAt = Date()
             pendingTutorPlaybackSessionID = sessionID
-            try await practiceRepository.requestTutorPlayback(sessionID: sessionID)
+            do {
+                try await practiceRepository.requestTutorPlayback(sessionID: sessionID)
+            } catch {
+                guard isSessionExpiredError(error) else {
+                    throw error
+                }
+                let recoveredSessionID = try await restartBackendSessionAndReconnect(for: quote)
+                pendingTutorPlaybackRequestedAt = Date()
+                pendingTutorPlaybackSessionID = recoveredSessionID
+                try await practiceRepository.requestTutorPlayback(sessionID: recoveredSessionID)
+            }
             let isRestartFromBeginning = playbackStateBeforeCommand.isFinishedAtEnd
             practiceStatusMessage = isRestartFromBeginning
                 ? "Tutor playback restarting from the beginning."
@@ -850,6 +903,7 @@ final class MainViewModel: ObservableObject {
         } catch {
             pendingTutorPlaybackRequestedAt = nil
             pendingTutorPlaybackSessionID = nil
+            refreshLiveAPIStatusAfterRequestError(error)
             return false
         }
     }
@@ -999,6 +1053,7 @@ final class MainViewModel: ObservableObject {
         do {
             try await practiceRepository.stopTutorPlayback(sessionID: sessionID)
         } catch {
+            refreshLiveAPIStatusAfterRequestError(error)
             return
         }
     }
@@ -1137,6 +1192,93 @@ final class MainViewModel: ObservableObject {
         var updatedSession = currentSession
         transform(&updatedSession)
         sessionState = .practice(updatedSession)
+    }
+
+    private func isSessionExpiredError(_ error: Error) -> Bool {
+        guard let serviceError = error as? PracticeService.PracticeServiceError else {
+            return false
+        }
+        guard case let .badStatusCode(statusCode, detail) = serviceError else {
+            return false
+        }
+        guard statusCode == 404 else {
+            return false
+        }
+
+        let normalizedDetail = (detail ?? "").lowercased()
+        if normalizedDetail.contains("session_not_found") || normalizedDetail.contains("session not found") {
+            return true
+        }
+
+        // Backend can restart and return generic 404 detail; treat as expired session for recovery.
+        return normalizedDetail.isEmpty
+    }
+
+    private func restartBackendSessionAndReconnect(for quote: Quote) async throws -> String {
+        updatePracticeSession { session in
+            session.backendSessionID = nil
+            session.tutorPlaybackIdentity = nil
+        }
+        pendingTutorPlaybackRequestedAt = nil
+        pendingTutorPlaybackSessionID = nil
+
+        let recoveredSessionID = try await ensurePracticeSessionID(for: quote)
+        await connectLiveKitIfNeeded(for: quote, sessionID: recoveredSessionID)
+        return recoveredSessionID
+    }
+
+    private func startLiveKitSetupIfStatusFailed(
+        for quote: Quote,
+        sessionID: String
+    ) async {
+        guard case .failed = liveKitConnectionState else {
+            return
+        }
+
+        await connectLiveKitIfNeeded(for: quote, sessionID: sessionID)
+    }
+
+    private func refreshLiveAPIStatusAfterRequestError(_ error: Error) {
+        guard let message = liveAPIErrorMessage(from: error) else {
+            return
+        }
+
+        let nextState = LiveKitConnectionState.failed(message: message)
+        liveKitConnectionState = nextState
+        tutorPlaybackManager.applyLiveKitConnectionState(nextState)
+    }
+
+    private func liveAPIErrorMessage(from error: Error) -> String? {
+        if error is CancellationError {
+            return nil
+        }
+
+        if let serviceError = error as? PracticeService.PracticeServiceError {
+            return serviceError.errorDescription ?? "Practice API request failed."
+        }
+
+        if let serviceError = error as? QuoteService.QuoteServiceError {
+            return serviceError.errorDescription ?? "Quotes API request failed."
+        }
+
+        if let tokenError = error as? LiveKitTokenProvider.TokenProviderError {
+            return tokenError.errorDescription ?? "LiveKit token request failed."
+        }
+
+        if let pollingError = error as? AnalysisPollingService.PollingError {
+            return pollingError.errorDescription ?? "Analysis polling failed."
+        }
+
+        if let urlError = error as? URLError {
+            return urlError.localizedDescription
+        }
+
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            return nsError.localizedDescription
+        }
+
+        return nil
     }
 }
 

@@ -6,7 +6,7 @@ _QUOTES: list[Quote] = [
     Quote(
         id="meditations-01",
         preview="A candour affected is a dagger concealed...",
-        text="A candour affected is a dagger concealed. The feigned friendship of the wolf is the most comtemptible of all, and to be shunned beyond everything. A man who is truly good and sincere and well-meaning wil show it by his looks, and no one can fail to see it.",
+        text="A candour affected is a dagger concealed. The feigned friendship of the wolf is the most comtemptible of all, and to be shunned beyond everything. A man who is truly good and sincere and well-meaning will show it by his looks, and no one can fail to see it.",
     ),
     Quote(
         id="infinite-jest-03",

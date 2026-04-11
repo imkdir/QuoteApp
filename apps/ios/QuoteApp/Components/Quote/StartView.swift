@@ -7,7 +7,8 @@ struct StartView: View {
         VStack(alignment: .leading, spacing: 24) {
             BrandHeader()
 
-            Spacer(minLength: 20)
+            Spacer()
+                .frame(height: 100)
 
             Text("Let’s practice")
                 .font(.system(size: 48, weight: .bold, design: .rounded))
