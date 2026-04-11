@@ -82,7 +82,6 @@ struct MainScreen: View {
                 Button("", systemImage: "text.quote", action: {
                     viewModel.openQuotePicker()
                 })
-                .buttonStyle(.bordered)
                 .foregroundStyle(.primary)
             }
             ToolbarItem(placement: .principal) {

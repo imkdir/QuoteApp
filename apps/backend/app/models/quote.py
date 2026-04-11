@@ -7,5 +7,4 @@ class Quote(BaseModel):
     """Minimal quote payload consumed by the iOS app."""
 
     id: str
-    preview: str
     text: str

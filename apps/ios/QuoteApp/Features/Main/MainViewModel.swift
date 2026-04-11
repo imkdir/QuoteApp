@@ -86,7 +86,7 @@ final class MainViewModel: ObservableObject {
         self.isTutorAudioDownloadInFlight = false
 
         let initialWordCount = sessionState.selectedQuoteWordCount
-        let initialQuoteText = sessionState.selectedQuote?.fullText
+        let initialQuoteText = sessionState.selectedQuote?.text
         self.tutorPlaybackManager.prepareForQuote(
             wordCount: initialWordCount,
             quoteText: initialQuoteText
@@ -244,7 +244,7 @@ final class MainViewModel: ObservableObject {
         isQuotePickerPresented = false
         tutorPlaybackManager.prepareForQuote(
             wordCount: quote.wordCount,
-            quoteText: quote.fullText
+            quoteText: quote.text
         )
         tutorPlaybackState = tutorPlaybackManager.playbackState
         feedbackSheetAnalysis = nil
@@ -773,7 +773,7 @@ final class MainViewModel: ObservableObject {
                 let newTask = Task<PracticeSessionStart, Error> {
                     try await practiceRepository.startSession(
                         quoteID: quote.id,
-                        quoteText: quote.fullText
+                        quoteText: quote.text
                     )
                 }
                 sessionStartTask = newTask
@@ -1448,7 +1448,7 @@ extension MainViewModel {
     }
 
     private static func previewMarkedWords(for quote: Quote) -> [String] {
-        let normalized = quote.fullText
+        let normalized = quote.text
             .split(whereSeparator: { $0.isWhitespace })
             .map {
                 $0.lowercased()

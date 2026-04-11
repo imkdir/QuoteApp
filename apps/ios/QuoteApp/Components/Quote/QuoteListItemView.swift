@@ -5,16 +5,10 @@ struct QuoteListItemView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(quote.previewText)
+            Text(quote.text)
                 .font(.body)
                 .foregroundStyle(.primary)
-                .lineLimit(2)
-
-            if !quote.bookTitle.isEmpty || !quote.author.isEmpty {
-                Text("\(quote.bookTitle) • \(quote.author)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+                .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
