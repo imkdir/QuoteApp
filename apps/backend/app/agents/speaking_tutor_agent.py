@@ -205,6 +205,8 @@ class SpeakingTutorAgentRuntime:
         )
 
         quote_script = build_tutor_quote_script(quote_text=context.quote_text)
+        if not quote_script:
+            raise RuntimeError("Selected quote text is empty; tutor playback requires quote text.")
         asyncio.run(
             _publish_quote_audio_to_livekit_room(
                 url=token_result.url,
@@ -253,14 +255,6 @@ async def _publish_quote_audio_to_livekit_room(
             quote_script=quote_script,
         )
 
-        await _publish_playback_event(
-            publish_data=publish_data,
-            session_id=session_id,
-            event="started",
-            word_count=word_count,
-            estimated_duration_sec=estimated_duration_sec,
-        )
-
         audio_source = rtc.AudioSource(sample_rate, num_channels)
         audio_track = rtc.LocalAudioTrack.create_audio_track("quoteapp-tutor-audio", audio_source)
 
@@ -278,6 +272,27 @@ async def _publish_quote_audio_to_livekit_room(
         frame_duration_ms = 20
         frame_samples_per_channel = max(1, int(sample_rate * (frame_duration_ms / 1000.0)))
         bytes_per_frame = frame_samples_per_channel * num_channels * 2
+        silence_frame_data = b"\x00" * bytes_per_frame
+        preroll_frames = 6
+        tail_padding_frames = 3
+
+        for _ in range(preroll_frames):
+            await audio_source.capture_frame(
+                rtc.AudioFrame(
+                    data=silence_frame_data,
+                    sample_rate=sample_rate,
+                    num_channels=num_channels,
+                    samples_per_channel=frame_samples_per_channel,
+                )
+            )
+
+        await _publish_playback_event(
+            publish_data=publish_data,
+            session_id=session_id,
+            event="started",
+            word_count=word_count,
+            estimated_duration_sec=estimated_duration_sec,
+        )
 
         stopped_early = False
         for offset in range(0, len(audio_bytes), bytes_per_frame):
@@ -310,6 +325,16 @@ async def _publish_quote_audio_to_livekit_room(
                 estimated_duration_sec=estimated_duration_sec,
             )
         else:
+            for _ in range(tail_padding_frames):
+                await audio_source.capture_frame(
+                    rtc.AudioFrame(
+                        data=silence_frame_data,
+                        sample_rate=sample_rate,
+                        num_channels=num_channels,
+                        samples_per_channel=frame_samples_per_channel,
+                    )
+                )
+
             wait_for_playout = getattr(audio_source, "wait_for_playout", None)
             if wait_for_playout is not None:
                 maybe_wait = wait_for_playout()

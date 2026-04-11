@@ -3,13 +3,20 @@ import Foundation
 
 @MainActor
 final class PlaybackTimingCoordinator {
+    enum CompletionBehavior: Equatable {
+        case waitForExplicitFinish
+        case autoFinishWhenProgressReachesEnd
+    }
+
     struct Configuration: Equatable {
         let wordsPerSecond: Double
         let tickInterval: TimeInterval
+        let backendStartDelaySeconds: TimeInterval
 
         static let `default` = Configuration(
             wordsPerSecond: 2.9,
-            tickInterval: 0.12
+            tickInterval: 0.12,
+            backendStartDelaySeconds: 0.12
         )
     }
 
@@ -22,6 +29,8 @@ final class PlaybackTimingCoordinator {
     private var runStartDate: Date?
     private var elapsedBeforeCurrentRun: TimeInterval = 0
     private var activeWordsPerSecond: Double
+    private var startDelaySeconds: TimeInterval = 0
+    private var completionBehavior: CompletionBehavior = .waitForExplicitFinish
 
     init(configuration: Configuration = .default) {
         self.configuration = configuration
@@ -34,18 +43,29 @@ final class PlaybackTimingCoordinator {
         runStartDate = nil
         elapsedBeforeCurrentRun = 0
         activeWordsPerSecond = configuration.wordsPerSecond
+        startDelaySeconds = 0
+        completionBehavior = .waitForExplicitFinish
         progress = PlaybackProgress(spokenWordCount: 0, totalWordCount: totalWordCount)
         onProgress?(progress)
     }
 
     func startFromBeginning(
         totalWordCount: Int,
-        expectedDurationSeconds: TimeInterval? = nil
+        expectedDurationSeconds: TimeInterval? = nil,
+        completionBehavior: CompletionBehavior = .waitForExplicitFinish,
+        startDelaySeconds: TimeInterval? = nil
     ) {
         stopTicker()
         runStartDate = nil
         elapsedBeforeCurrentRun = 0
         progress = PlaybackProgress(spokenWordCount: 0, totalWordCount: totalWordCount)
+        self.completionBehavior = completionBehavior
+        self.startDelaySeconds = max(
+            0,
+            startDelaySeconds ?? (
+                completionBehavior == .waitForExplicitFinish ? configuration.backendStartDelaySeconds : 0
+            )
+        )
         activeWordsPerSecond = wordsPerSecond(
             totalWordCount: totalWordCount,
             expectedDurationSeconds: expectedDurationSeconds
@@ -112,7 +132,17 @@ final class PlaybackTimingCoordinator {
         }
 
         let elapsed = elapsedBeforeCurrentRun + now.timeIntervalSince(runStartDate)
-        let spokenWordCount = Int(floor(elapsed * activeWordsPerSecond))
+        let effectiveElapsed = max(0, elapsed - startDelaySeconds)
+        let rawSpokenWordCount = Int(floor(effectiveElapsed * activeWordsPerSecond))
+        let maxSpokenWordCount: Int
+        switch completionBehavior {
+        case .waitForExplicitFinish:
+            maxSpokenWordCount = max(0, progress.totalWordCount - 1)
+        case .autoFinishWhenProgressReachesEnd:
+            maxSpokenWordCount = progress.totalWordCount
+        }
+
+        let spokenWordCount = min(max(0, rawSpokenWordCount), maxSpokenWordCount)
         let nextProgress = PlaybackProgress(
             spokenWordCount: spokenWordCount,
             totalWordCount: progress.totalWordCount
@@ -125,7 +155,7 @@ final class PlaybackTimingCoordinator {
         progress = nextProgress
         onProgress?(progress)
 
-        if progress.isAtEnd {
+        if completionBehavior == .autoFinishWhenProgressReachesEnd, progress.isAtEnd {
             elapsedBeforeCurrentRun = elapsed
             self.runStartDate = nil
             stopTicker()

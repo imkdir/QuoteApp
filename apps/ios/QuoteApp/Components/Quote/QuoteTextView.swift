@@ -18,6 +18,7 @@ struct QuoteTextView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 8)
         .animation(.easeOut(duration: 0.14), value: spokenWordCount)
+        .animation(.easeInOut(duration: 0.18), value: markedWordCount)
     }
 
     private var styledQuoteText: Text {
@@ -41,6 +42,10 @@ struct QuoteTextView: View {
 
     private var spokenWordCount: Int {
         tokens.filter { $0.isSpoken }.count
+    }
+
+    private var markedWordCount: Int {
+        tokens.filter { $0.isMarked }.count
     }
 }
 

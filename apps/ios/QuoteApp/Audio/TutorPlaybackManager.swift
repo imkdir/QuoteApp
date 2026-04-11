@@ -58,7 +58,8 @@ final class TutorPlaybackManager: ObservableObject {
         )
         timingCoordinator.startFromBeginning(
             totalWordCount: clampedWordCount,
-            expectedDurationSeconds: estimatedDurationSeconds
+            expectedDurationSeconds: estimatedDurationSeconds,
+            completionBehavior: .waitForExplicitFinish
         )
     }
 
@@ -69,13 +70,19 @@ final class TutorPlaybackManager: ObservableObject {
         )
         timingCoordinator.startFromBeginning(
             totalWordCount: clampedWordCount,
-            expectedDurationSeconds: nil
+            expectedDurationSeconds: nil,
+            completionBehavior: .autoFinishWhenProgressReachesEnd
         )
     }
 
     func pauseFromBackendStop() {
         timingCoordinator.pause()
-        playbackState = .paused(progress: timingCoordinator.progress)
+        switch playbackState {
+        case .playing, .paused:
+            playbackState = .paused(progress: timingCoordinator.progress)
+        case .finishedAtEnd, .idle:
+            return
+        }
     }
 
     func markFinishedAtEndFromBackend() {
@@ -88,10 +95,12 @@ final class TutorPlaybackManager: ObservableObject {
     }
 
     func forceStopForRecording() {
-        guard playbackState.isPlaying else {
+        guard !playbackState.isFinishedAtEnd else {
             return
         }
-        pauseFromBackendStop()
+
+        timingCoordinator.finishAtEnd()
+        playbackState = .finishedAtEnd(progress: timingCoordinator.progress)
     }
 
     func applyLiveKitConnectionState(_ state: LiveKitConnectionState) {

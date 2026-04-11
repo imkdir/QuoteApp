@@ -28,7 +28,7 @@ enum LocalRecordingDraftState: Equatable {
 }
 
 struct LocalRecordingDraft: Equatable {
-    let recordingReference: String
+    var recordingReference: String
     var state: LocalRecordingDraftState
 }
 
@@ -64,6 +64,10 @@ struct PracticeSession: Equatable {
 
     var hasLocalRecordingDraft: Bool {
         localRecordingDraft != nil
+    }
+
+    var isInRecordingExclusiveMode: Bool {
+        hasLocalRecordingDraft
     }
 
     var quoteWordCount: Int {

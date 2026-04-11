@@ -61,6 +61,13 @@ enum PlaybackState: Equatable {
         return false
     }
 
+    var isPaused: Bool {
+        if case .paused = self {
+            return true
+        }
+        return false
+    }
+
     var isFinishedAtEnd: Bool {
         if case .finishedAtEnd = self {
             return true

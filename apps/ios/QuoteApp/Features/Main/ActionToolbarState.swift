@@ -26,8 +26,10 @@ struct ActionToolbarState: Equatable {
         switch playbackState {
         case .playing:
             return .pause
-        case .idle, .paused, .finishedAtEnd:
-            return .playRepeat
+        case .idle, .paused:
+            return .play
+        case .finishedAtEnd:
+            return .repeatPlayback
         }
     }
 

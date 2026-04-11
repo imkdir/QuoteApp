@@ -4,16 +4,10 @@ from __future__ import annotations
 
 
 def build_tutor_quote_script(*, quote_text: str) -> str:
-    """Returns the short script the tutor should speak in the LiveKit room."""
+    """Returns the exact quote text for tutor playback with no extra wording."""
 
     normalized_quote = quote_text.strip()
-    if not normalized_quote:
-        return "Let's practice speaking. I cannot read a quote right now."
-
-    return (
-        "Let's practice this quote. Listen once, then repeat it clearly.\n"
-        f"{normalized_quote}"
-    )
+    return normalized_quote
 
 
 def build_info_feedback(*, marked_words: list[str]) -> str:

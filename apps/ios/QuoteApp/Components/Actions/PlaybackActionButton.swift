@@ -3,14 +3,17 @@ import SwiftUI
 struct PlaybackActionButton: View {
     enum Mode: Equatable {
         case pause
-        case playRepeat
+        case play
+        case repeatPlayback
 
         var title: String {
             switch self {
             case .pause:
                 return "Pause"
-            case .playRepeat:
+            case .play:
                 return "Play"
+            case .repeatPlayback:
+                return "Repeat"
             }
         }
 
@@ -18,8 +21,19 @@ struct PlaybackActionButton: View {
             switch self {
             case .pause:
                 return "pause.circle.fill"
-            case .playRepeat:
+            case .play, .repeatPlayback:
                 return "play.circle.fill"
+            }
+        }
+
+        var accessibilityHint: String {
+            switch self {
+            case .pause:
+                return "Pauses tutor playback"
+            case .play:
+                return "Starts tutor playback"
+            case .repeatPlayback:
+                return "Restarts tutor playback from the beginning"
             }
         }
     }
@@ -37,7 +51,7 @@ struct PlaybackActionButton: View {
         .tint(.gray.opacity(0.2))
         .foregroundStyle(.blue)
         .accessibilityLabel(mode.title)
-        .accessibilityHint(mode == .pause ? "Pauses tutor playback" : "Starts, resumes, or repeats tutor playback")
+        .accessibilityHint(mode.accessibilityHint)
     }
 }
 
@@ -49,9 +63,13 @@ struct PlaybackActionButton_Previews: PreviewProvider {
                 .padding()
                 .previewDisplayName("Pause")
 
-            PlaybackActionButton(mode: .playRepeat, action: {})
+            PlaybackActionButton(mode: .play, action: {})
                 .padding()
-                .previewDisplayName("Play/Repeat")
+                .previewDisplayName("Play")
+
+            PlaybackActionButton(mode: .repeatPlayback, action: {})
+                .padding()
+                .previewDisplayName("Repeat")
         }
     }
 }

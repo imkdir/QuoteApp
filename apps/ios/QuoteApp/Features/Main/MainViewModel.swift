@@ -111,7 +111,7 @@ final class MainViewModel: ObservableObject {
             playbackState: tutorPlaybackState,
             localRecordingDraftState: session.localRecordingDraft?.state,
             latestAttemptReviewState: latestAttemptReviewState,
-            hasAttemptHistory: latestAnalysis != nil
+            hasAttemptHistory: session.hasAttemptHistory
         )
     }
 
@@ -315,7 +315,7 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        guard sessionState.practiceSession?.localRecordingDraft == nil else {
+        guard !isInRecordingExclusiveMode else {
             return
         }
 
@@ -333,6 +333,8 @@ final class MainViewModel: ObservableObject {
                 return
             }
 
+            let playbackStateBeforeCommand = self.tutorPlaybackState
+
             switch self.tutorPlaybackState {
             case .playing:
                 self.isTutorPlaybackCommandInFlight = true
@@ -348,8 +350,12 @@ final class MainViewModel: ObservableObject {
                     self.tutorPlaybackManager.beginLocalDevelopmentFallbackPlayback(
                         wordCount: selectedQuote.wordCount
                     )
+                    let isRestartFromBeginning =
+                        playbackStateBeforeCommand.isPaused || playbackStateBeforeCommand.isFinishedAtEnd
                     self.practiceStatusMessage =
-                        "Development fallback: local quote timing is active (no backend tutor audio)."
+                        isRestartFromBeginning
+                        ? "Development fallback: restarted from the beginning (no backend tutor audio)."
+                        : "Development fallback: local quote timing is active (no backend tutor audio)."
                     return
                 }
 
@@ -358,7 +364,11 @@ final class MainViewModel: ObservableObject {
                     let sessionID = try await self.ensurePracticeSessionID(for: selectedQuote)
                     await self.setTutorAudioPlaybackEnabled(true)
                     try await practiceRepository.requestTutorPlayback(sessionID: sessionID)
-                    self.practiceStatusMessage = "Tutor playback requested."
+                    let isRestartFromBeginning =
+                        playbackStateBeforeCommand.isPaused || playbackStateBeforeCommand.isFinishedAtEnd
+                    self.practiceStatusMessage = isRestartFromBeginning
+                        ? "Tutor playback restarting from the beginning."
+                        : "Tutor playback requested."
                     self.isTutorPlaybackCommandInFlight = false
                 } catch {
                     self.practiceStatusMessage = "Could not start tutor playback from backend."
@@ -373,27 +383,23 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        supersedeActiveLoadingAttemptForUI()
-        feedbackSheetAnalysis = nil
-        tutorPlaybackManager.forceStopForRecording()
-        tutorPlaybackState = tutorPlaybackManager.playbackState
-
-        Task { [weak self] in
-            guard let self else {
-                return
-            }
-            await self.setTutorAudioPlaybackEnabled(false)
-            await self.stopTutorPlaybackForSessionIfPossible(self.currentBackendSessionID)
+        guard !isInRecordingExclusiveMode else {
+            return
         }
 
+        let provisionalRecordingReference = "local-draft-\(UUID().uuidString)"
+        updatePracticeSession { session in
+            session.localRecordingDraft = LocalRecordingDraft(
+                recordingReference: provisionalRecordingReference,
+                state: .recording
+            )
+        }
+
+        supersedeActiveLoadingAttemptForUI()
+        feedbackSheetAnalysis = nil
+        stopTutorPlaybackForRecordingPrecedence()
+
         guard let userRecordingManager else {
-            let reference = "local-draft-\(Int(Date().timeIntervalSince1970))"
-            updatePracticeSession { session in
-                session.localRecordingDraft = LocalRecordingDraft(
-                    recordingReference: reference,
-                    state: .recording
-                )
-            }
             practiceStatusMessage = "Recording started (mock)."
             return
         }
@@ -408,15 +414,23 @@ final class MainViewModel: ObservableObject {
                     audioSessionManager: self.audioSessionManager
                 )
                 self.updatePracticeSession { session in
-                    session.localRecordingDraft = LocalRecordingDraft(
-                        recordingReference: fileURL.path,
-                        state: .recording
-                    )
+                    guard var localDraft = session.localRecordingDraft else {
+                        return
+                    }
+                    localDraft.recordingReference = fileURL.path
+                    localDraft.state = .recording
+                    session.localRecordingDraft = localDraft
                 }
                 self.practiceStatusMessage = "Recording started."
             } catch UserRecordingManager.RecordingError.microphonePermissionDenied {
+                self.updatePracticeSession { session in
+                    session.localRecordingDraft = nil
+                }
                 self.practiceStatusMessage = "Microphone permission denied. Enable it in Settings to record."
             } catch {
+                self.updatePracticeSession { session in
+                    session.localRecordingDraft = nil
+                }
                 if let detail = userRecordingManager.lastErrorMessage, !detail.isEmpty {
                     self.practiceStatusMessage = detail
                 } else {
@@ -706,7 +720,7 @@ final class MainViewModel: ObservableObject {
 
                 if previousState.isPlaying,
                    state.isFinishedAtEnd,
-                   self.sessionState.practiceSession?.localRecordingDraft == nil {
+                   !self.isInRecordingExclusiveMode {
                     self.practiceStatusMessage = "Tutor playback finished."
                 }
             }
@@ -806,10 +820,19 @@ final class MainViewModel: ObservableObject {
         sessionState.practiceSession?.backendSessionID
     }
 
+    private var isInRecordingExclusiveMode: Bool {
+        sessionState.practiceSession?.isInRecordingExclusiveMode ?? false
+    }
+
     private func handleTutorPlaybackEvent(_ event: TutorPlaybackEvent) {
         switch event {
         case let .started(sessionID, wordCount, estimatedDurationSeconds):
             guard matchesCurrentSession(eventSessionID: sessionID) else {
+                return
+            }
+
+            guard !isInRecordingExclusiveMode else {
+                stopTutorPlaybackForRecordingPrecedence()
                 return
             }
 
@@ -827,7 +850,7 @@ final class MainViewModel: ObservableObject {
             }
 
             tutorPlaybackManager.markFinishedAtEndFromBackend()
-            if sessionState.practiceSession?.localRecordingDraft == nil {
+            if !isInRecordingExclusiveMode {
                 practiceStatusMessage = "Tutor playback finished."
             }
 
@@ -836,10 +859,29 @@ final class MainViewModel: ObservableObject {
                 return
             }
 
+            guard !isInRecordingExclusiveMode else {
+                tutorPlaybackManager.forceStopForRecording()
+                tutorPlaybackState = tutorPlaybackManager.playbackState
+                return
+            }
+
             tutorPlaybackManager.markStoppedFromBackend()
-            if sessionState.practiceSession?.localRecordingDraft == nil {
+            if !isInRecordingExclusiveMode {
                 practiceStatusMessage = "Tutor playback paused."
             }
+        }
+    }
+
+    private func stopTutorPlaybackForRecordingPrecedence() {
+        tutorPlaybackManager.forceStopForRecording()
+        tutorPlaybackState = tutorPlaybackManager.playbackState
+
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+            await self.setTutorAudioPlaybackEnabled(false)
+            await self.stopTutorPlaybackForSessionIfPossible(self.currentBackendSessionID)
         }
     }
 
