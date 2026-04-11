@@ -2,6 +2,13 @@ import SwiftUI
 
 struct QuoteTextView: View {
     let tokens: [QuoteToken]
+    let isWaitingForPlaybackStart: Bool
+    @State private var isDimmedTextBreathing = false
+
+    init(tokens: [QuoteToken], isWaitingForPlaybackStart: Bool = false) {
+        self.tokens = tokens
+        self.isWaitingForPlaybackStart = isWaitingForPlaybackStart
+    }
 
     var body: some View {
         Group {
@@ -17,8 +24,15 @@ struct QuoteTextView: View {
         .multilineTextAlignment(.leading)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 8)
+        .opacity(quoteBreathingOpacity)
         .animation(.easeOut(duration: 0.14), value: spokenWordCount)
         .animation(.easeInOut(duration: 0.18), value: markedWordCount)
+        .onAppear {
+            updateDimmedBreathingAnimation(isActive: isWaitingForPlaybackStart)
+        }
+        .onChange(of: isWaitingForPlaybackStart) { isActive in
+            updateDimmedBreathingAnimation(isActive: isActive)
+        }
     }
 
     private var styledQuoteText: Text {
@@ -46,6 +60,30 @@ struct QuoteTextView: View {
 
     private var markedWordCount: Int {
         tokens.filter { $0.isMarked }.count
+    }
+
+    private var quoteBreathingOpacity: Double {
+        guard isWaitingForPlaybackStart else {
+            return 1
+        }
+
+        return isDimmedTextBreathing ? 0.3 : 1
+    }
+
+    private func updateDimmedBreathingAnimation(isActive: Bool) {
+        if isActive {
+            guard !isDimmedTextBreathing else {
+                return
+            }
+            withAnimation(.easeInOut(duration: 1.25).repeatForever(autoreverses: true)) {
+                isDimmedTextBreathing = true
+            }
+            return
+        }
+
+        withAnimation(.easeOut(duration: 0.16)) {
+            isDimmedTextBreathing = false
+        }
     }
 
     private func separatorTextBeforeToken(at index: Int) -> Text {

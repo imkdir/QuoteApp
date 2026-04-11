@@ -32,7 +32,13 @@ struct PlaybackProgress: Equatable {
 }
 
 enum PlaybackState: Equatable {
+    enum RequestOrigin: Equatable {
+        case play
+        case repeatPlayback
+    }
+
     case idle(totalWordCount: Int)
+    case requesting(progress: PlaybackProgress, origin: RequestOrigin)
     case playing(progress: PlaybackProgress)
     case paused(progress: PlaybackProgress)
     case finishedAtEnd(progress: PlaybackProgress)
@@ -41,7 +47,10 @@ enum PlaybackState: Equatable {
         switch self {
         case let .idle(totalWordCount):
             return PlaybackProgress(spokenWordCount: 0, totalWordCount: totalWordCount)
-        case let .playing(progress), let .paused(progress), let .finishedAtEnd(progress):
+        case let .requesting(progress, _),
+             let .playing(progress),
+             let .paused(progress),
+             let .finishedAtEnd(progress):
             return progress
         }
     }
@@ -70,6 +79,13 @@ enum PlaybackState: Equatable {
 
     var isFinishedAtEnd: Bool {
         if case .finishedAtEnd = self {
+            return true
+        }
+        return false
+    }
+
+    var isRequesting: Bool {
+        if case .requesting = self {
             return true
         }
         return false

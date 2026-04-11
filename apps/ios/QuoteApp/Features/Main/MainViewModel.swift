@@ -43,6 +43,7 @@ final class MainViewModel: ObservableObject {
     private var isTutorPlaybackCommandInFlight = false
     private var pendingTutorPlaybackRequestedAt: Date?
     private var pendingTutorPlaybackSessionID: String?
+    private var pendingTutorPlaybackRestoreState: PlaybackState?
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -214,6 +215,10 @@ final class MainViewModel: ObservableObject {
         return false
     }
 
+    var isTutorPlaybackRequestInFlight: Bool {
+        tutorPlaybackState.isRequesting
+    }
+
     private static let defaultWaveformLevels = Array(repeating: CGFloat(0.12), count: 16)
 
     func openQuotePicker() {
@@ -229,7 +234,8 @@ final class MainViewModel: ObservableObject {
         let previousSessionID = sessionState.practiceSession?.backendSessionID
         let previousLiveKitRoomName = sessionState.practiceSession?.liveKitRoomName
         let shouldStopPreviousTutorPlayback =
-            tutorPlaybackState.isPlaying && tutorPlaybackManager.isUsingBackendStream
+            (tutorPlaybackState.isPlaying && tutorPlaybackManager.isUsingBackendStream)
+            || tutorPlaybackState.isRequesting
 
         sessionStartTask?.cancel()
         sessionStartTask = nil
@@ -237,6 +243,8 @@ final class MainViewModel: ObservableObject {
         resultPollingTask = nil
         activeLoadingAttemptID = nil
         isTutorAudioDownloadInFlight = false
+        isTutorPlaybackCommandInFlight = false
+        cancelTutorPlaybackRequestIfNeeded(restorePreviousState: false)
 
         sessionState = .practice(
             PracticeSession(
@@ -360,6 +368,10 @@ final class MainViewModel: ObservableObject {
             return
         }
 
+        guard !tutorPlaybackState.isRequesting else {
+            return
+        }
+
         Task { [weak self] in
             guard let self else {
                 return
@@ -369,9 +381,16 @@ final class MainViewModel: ObservableObject {
                 return
             }
 
+            guard !self.tutorPlaybackState.isRequesting else {
+                return
+            }
+
             let playbackStateBeforeCommand = self.tutorPlaybackState
 
             switch self.tutorPlaybackState {
+            case .requesting:
+                return
+
             case .playing:
                 self.isTutorPlaybackCommandInFlight = true
                 self.isTutorAudioDownloadInFlight = false
@@ -400,6 +419,10 @@ final class MainViewModel: ObservableObject {
 
                 self.isTutorPlaybackCommandInFlight = true
                 self.isTutorAudioDownloadInFlight = false
+                self.beginTutorPlaybackRequest(
+                    for: selectedQuote,
+                    playbackStateBeforeCommand: playbackStateBeforeCommand
+                )
                 defer {
                     self.isTutorAudioDownloadInFlight = false
                     self.isTutorPlaybackCommandInFlight = false
@@ -408,8 +431,10 @@ final class MainViewModel: ObservableObject {
                 do {
                     let sessionID = try await self.ensurePracticeSessionID(for: selectedQuote)
                     guard self.sessionState.selectedQuote?.id == selectedQuote.id else {
+                        self.cancelTutorPlaybackRequestIfNeeded(restorePreviousState: true)
                         return
                     }
+                    self.pendingTutorPlaybackSessionID = sessionID
                     await self.startLiveKitSetupIfStatusFailed(
                         for: selectedQuote,
                         sessionID: sessionID
@@ -427,6 +452,7 @@ final class MainViewModel: ObservableObject {
                                 estimatedDurationSeconds: cachedArtifact.metadata?.estimatedDurationSeconds,
                                 rhythmWordEndTimes: cachedArtifact.metadata?.rhythmWordEndTimes ?? []
                             )
+                            self.completeTutorPlaybackRequest()
                             self.practiceStatusMessage = "Tutor playback started from device cache."
                             return
                         } catch {
@@ -473,6 +499,7 @@ final class MainViewModel: ObservableObject {
                         estimatedDurationSeconds: artifact.estimatedDurationSeconds,
                         rhythmWordEndTimes: artifact.rhythmWordEndTimes
                     )
+                    self.completeTutorPlaybackRequest()
 
                     let isRestartFromBeginning = playbackStateBeforeCommand.isFinishedAtEnd
                     self.practiceStatusMessage = isRestartFromBeginning
@@ -485,8 +512,7 @@ final class MainViewModel: ObservableObject {
                         playbackStateBeforeCommand: playbackStateBeforeCommand
                     )
                     if !fallbackStarted {
-                        self.pendingTutorPlaybackRequestedAt = nil
-                        self.pendingTutorPlaybackSessionID = nil
+                        self.cancelTutorPlaybackRequestIfNeeded(restorePreviousState: true)
                         self.practiceStatusMessage = "Could not start tutor playback from backend."
                     }
                 }
@@ -944,8 +970,6 @@ final class MainViewModel: ObservableObject {
                 : "Tutor playback requested."
             return true
         } catch {
-            pendingTutorPlaybackRequestedAt = nil
-            pendingTutorPlaybackSessionID = nil
             refreshLiveAPIStatusAfterRequestError(error)
             return false
         }
@@ -1013,6 +1037,40 @@ final class MainViewModel: ObservableObject {
         sessionState.practiceSession?.isInRecordingExclusiveMode ?? false
     }
 
+    private func beginTutorPlaybackRequest(
+        for quote: Quote,
+        playbackStateBeforeCommand: PlaybackState
+    ) {
+        pendingTutorPlaybackRestoreState = playbackStateBeforeCommand
+        pendingTutorPlaybackRequestedAt = Date()
+        pendingTutorPlaybackSessionID = currentBackendSessionID
+
+        tutorPlaybackManager.markPlaybackRequestInProgress(
+            wordCount: quote.wordCount,
+            origin: playbackRequestOrigin(for: playbackStateBeforeCommand)
+        )
+        tutorPlaybackState = tutorPlaybackManager.playbackState
+    }
+
+    private func completeTutorPlaybackRequest() {
+        pendingTutorPlaybackRestoreState = nil
+        pendingTutorPlaybackRequestedAt = nil
+        pendingTutorPlaybackSessionID = nil
+    }
+
+    private func cancelTutorPlaybackRequestIfNeeded(restorePreviousState: Bool) {
+        let fallbackState = restorePreviousState ? pendingTutorPlaybackRestoreState : nil
+        completeTutorPlaybackRequest()
+        tutorPlaybackManager.cancelPlaybackRequest(restoring: fallbackState)
+        tutorPlaybackState = tutorPlaybackManager.playbackState
+    }
+
+    private func playbackRequestOrigin(
+        for playbackState: PlaybackState
+    ) -> PlaybackState.RequestOrigin {
+        playbackState.isFinishedAtEnd ? .repeatPlayback : .play
+    }
+
     private func handleTutorPlaybackEvent(_ event: TutorPlaybackEvent) {
         switch event {
         case let .started(sessionID, wordCount, estimatedDurationSeconds):
@@ -1028,11 +1086,10 @@ final class MainViewModel: ObservableObject {
                     elapsedMs
                 )
             }
-            pendingTutorPlaybackRequestedAt = nil
-            pendingTutorPlaybackSessionID = nil
+            completeTutorPlaybackRequest()
 
             guard !isInRecordingExclusiveMode else {
-                stopTutorPlaybackForRecordingPrecedence()
+                stopTutorPlaybackForRecordingPrecedence(sessionIDOverride: sessionID)
                 return
             }
 
@@ -1048,8 +1105,7 @@ final class MainViewModel: ObservableObject {
             guard matchesCurrentSession(eventSessionID: sessionID) else {
                 return
             }
-            pendingTutorPlaybackRequestedAt = nil
-            pendingTutorPlaybackSessionID = nil
+            completeTutorPlaybackRequest()
 
             tutorPlaybackManager.markFinishedAtEndFromBackend()
             if !isInRecordingExclusiveMode {
@@ -1060,12 +1116,21 @@ final class MainViewModel: ObservableObject {
             guard matchesCurrentSession(eventSessionID: sessionID) else {
                 return
             }
-            pendingTutorPlaybackRequestedAt = nil
-            pendingTutorPlaybackSessionID = nil
+            let wasRequestingPlayback = tutorPlaybackState.isRequesting
+            if wasRequestingPlayback {
+                cancelTutorPlaybackRequestIfNeeded(restorePreviousState: true)
+            } else {
+                completeTutorPlaybackRequest()
+            }
 
             guard !isInRecordingExclusiveMode else {
                 tutorPlaybackManager.forceStopForRecording()
                 tutorPlaybackState = tutorPlaybackManager.playbackState
+                return
+            }
+
+            if wasRequestingPlayback {
+                practiceStatusMessage = "Tutor playback stopped before audio started."
                 return
             }
 
@@ -1076,8 +1141,14 @@ final class MainViewModel: ObservableObject {
         }
     }
 
-    private func stopTutorPlaybackForRecordingPrecedence() {
-        let shouldStopBackendTransport = tutorPlaybackManager.isUsingBackendStream
+    private func stopTutorPlaybackForRecordingPrecedence(sessionIDOverride: String? = nil) {
+        let hasPendingPlaybackRequest =
+            tutorPlaybackState.isRequesting || pendingTutorPlaybackSessionID != nil
+        let shouldStopBackendTransport =
+            tutorPlaybackManager.isUsingBackendStream || hasPendingPlaybackRequest
+        let sessionIDToStop = sessionIDOverride ?? pendingTutorPlaybackSessionID ?? currentBackendSessionID
+
+        completeTutorPlaybackRequest()
         tutorPlaybackManager.forceStopForRecording()
         tutorPlaybackState = tutorPlaybackManager.playbackState
 
@@ -1089,7 +1160,7 @@ final class MainViewModel: ObservableObject {
                 return
             }
             await self.setTutorAudioPlaybackEnabled(false)
-            await self.stopTutorPlaybackForSessionIfPossible(self.currentBackendSessionID)
+            await self.stopTutorPlaybackForSessionIfPossible(sessionIDToStop)
         }
     }
 

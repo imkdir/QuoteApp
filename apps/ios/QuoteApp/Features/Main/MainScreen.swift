@@ -42,7 +42,10 @@ struct MainScreen: View {
     private func practiceView(quote: Quote?) -> some View {
         VStack(alignment: .leading, spacing: 20) {
             if let quote {
-                QuoteTextView(tokens: viewModel.tokens(from: quote))
+                QuoteTextView(
+                    tokens: viewModel.tokens(from: quote),
+                    isWaitingForPlaybackStart: viewModel.isTutorPlaybackRequestInFlight
+                )
             } else {
                 QuoteListView(
                     quotes: viewModel.quotes,
@@ -66,7 +69,7 @@ struct MainScreen: View {
             ToolbarItemGroup(placement: .bottomBar) {
                 ActionStackView(
                     toolbarState: viewModel.actionToolbarState,
-                    isPlaybackButtonDisabled: viewModel.isTutorAudioDownloadInFlight,
+                    isPlaybackButtonDisabled: viewModel.isTutorPlaybackRequestInFlight,
                     recordingWaveformLevels: viewModel.recordingWaveformLevels,
                     onPlaybackTapped: viewModel.playbackTapped,
                     onRecordTapped: viewModel.recordTapped,

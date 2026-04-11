@@ -59,6 +59,8 @@ final class TutorPlaybackManager: NSObject, ObservableObject {
             }
 
             switch self.playbackState {
+            case let .requesting(_, origin):
+                self.playbackState = .requesting(progress: progress, origin: origin)
             case .playing:
                 self.playbackState = .playing(progress: progress)
             case .paused:
@@ -97,6 +99,43 @@ final class TutorPlaybackManager: NSObject, ObservableObject {
             totalWordCount: clampedWordCount,
             expectedDurationSeconds: estimatedDurationSeconds
         )
+    }
+
+    func markPlaybackRequestInProgress(
+        wordCount: Int,
+        origin: PlaybackState.RequestOrigin
+    ) {
+        stopLocalAudioPlayback()
+        activePlaybackSource = .none
+
+        let clampedWordCount = max(0, wordCount)
+        timingCoordinator.reset(totalWordCount: clampedWordCount)
+        playbackState = .requesting(
+            progress: PlaybackProgress(
+                spokenWordCount: 0,
+                totalWordCount: clampedWordCount
+            ),
+            origin: origin
+        )
+    }
+
+    func cancelPlaybackRequest(restoring fallbackState: PlaybackState? = nil) {
+        guard playbackState.isRequesting else {
+            return
+        }
+
+        stopLocalAudioPlayback()
+        activePlaybackSource = .none
+
+        let nextState = fallbackState ?? .idle(totalWordCount: playbackState.totalWordCount)
+        switch nextState {
+        case .playing:
+            playbackState = .idle(totalWordCount: playbackState.totalWordCount)
+        case .requesting:
+            playbackState = .idle(totalWordCount: playbackState.totalWordCount)
+        case .idle, .paused, .finishedAtEnd:
+            playbackState = nextState
+        }
     }
 
     func beginPlaybackFromCachedAudioFile(
@@ -151,7 +190,7 @@ final class TutorPlaybackManager: NSObject, ObservableObject {
         switch playbackState {
         case .playing, .paused:
             playbackState = .paused(progress: timingCoordinator.progress)
-        case .finishedAtEnd, .idle:
+        case .finishedAtEnd, .idle, .requesting:
             return
         }
     }

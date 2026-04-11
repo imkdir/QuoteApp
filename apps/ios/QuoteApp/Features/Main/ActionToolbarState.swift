@@ -24,6 +24,13 @@ struct ActionToolbarState: Equatable {
             return .pause
         case .idle:
             return .play
+        case let .requesting(_, origin):
+            switch origin {
+            case .play:
+                return .play
+            case .repeatPlayback:
+                return .repeatPlayback
+            }
         case .paused:
             return .play
         case .finishedAtEnd:
