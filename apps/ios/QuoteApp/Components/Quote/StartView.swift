@@ -9,20 +9,17 @@ struct StartView: View {
 
             Spacer(minLength: 20)
 
-            Text("Let’s speak")
+            Text("Let’s practice")
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundStyle(.primary)
 
-            Text("Choose a quote and begin a simple speaking practice round.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-
             Button(action: onPickQuote) {
                 Label("Choose a quote", systemImage: "text.quote")
-                    .frame(maxWidth: .infinity)
+                    .font(.headline)
+                    .padding(4)
             }
             .buttonStyle(.borderedProminent)
-
+            
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

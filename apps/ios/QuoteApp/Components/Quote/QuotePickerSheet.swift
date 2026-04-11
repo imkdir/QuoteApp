@@ -6,29 +6,11 @@ struct QuotePickerSheet: View {
     let errorMessage: String?
     let onSelect: (Quote) -> Void
     let onRetry: () -> Void
-    let onClose: () -> Void
 
     var body: some View {
         VStack(spacing: 16) {
-            HStack {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.headline)
-                        .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.bordered)
-
-                Spacer()
-
-                Text("Quotes")
-                    .font(.headline)
-
-                Spacer()
-
-                Color.clear
-                    .frame(width: 32, height: 32)
-            }
-
+            Text("Quotes")
+                .font(.headline)
             content
         }
         .padding(20)
@@ -80,7 +62,6 @@ struct QuotePickerSheet_Previews: PreviewProvider {
                 errorMessage: nil,
                 onSelect: { _ in },
                 onRetry: {},
-                onClose: {}
             )
             .previewDisplayName("Quote Picker Loading")
 
@@ -90,7 +71,6 @@ struct QuotePickerSheet_Previews: PreviewProvider {
                 errorMessage: nil,
                 onSelect: { _ in },
                 onRetry: {},
-                onClose: {}
             )
             .previewDisplayName("Quote Picker Success")
 
@@ -100,7 +80,6 @@ struct QuotePickerSheet_Previews: PreviewProvider {
                 errorMessage: "Could not load quotes. Check backend and retry.",
                 onSelect: { _ in },
                 onRetry: {},
-                onClose: {}
             )
             .previewDisplayName("Quote Picker Failure")
         }

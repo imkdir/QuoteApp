@@ -25,7 +25,6 @@ struct MainScreen: View {
                 errorMessage: viewModel.quoteLoadingErrorMessage,
                 onSelect: viewModel.selectQuote,
                 onRetry: viewModel.retryQuoteLoading,
-                onClose: viewModel.closeQuotePicker
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
@@ -54,19 +53,6 @@ struct MainScreen: View {
 
     private func practiceView(quote: Quote) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack(spacing: 12) {
-                BrandHeader()
-                Button("Quotes") {
-                    viewModel.openQuotePicker()
-                }
-                .buttonStyle(.bordered)
-            }
-
-            if let liveKitStatus = viewModel.liveKitStatusBannerText {
-                Text(liveKitStatus)
-                    .font(.footnote)
-                    .foregroundStyle(viewModel.isLiveKitStatusError ? .orange : .secondary)
-            }
 
             QuoteTextView(tokens: viewModel.currentQuoteTokens)
 
@@ -84,10 +70,24 @@ struct MainScreen: View {
                 onReviewTapped: viewModel.reviewTapped
             )
 
+            #if targetEnvironment(simulator)
             Text(viewModel.practiceStatusMessage)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
+            #endif
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("", systemImage: "text.quote", action: {
+                    viewModel.openQuotePicker()
+                })
+                .buttonStyle(.bordered)
+                .foregroundStyle(.primary)
+            }
+            ToolbarItem(placement: .principal) {
+                Image(systemName: viewModel.liveKitStatusSymbol)
+            }
         }
     }
 }

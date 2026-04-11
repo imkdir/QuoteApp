@@ -191,6 +191,20 @@ final class MainViewModel: ObservableObject {
             return "LiveKit connection error: \(message)"
         }
     }
+    
+    var liveKitStatusSymbol: String {
+        switch liveKitConnectionState {
+        case .disconnected:
+            return "waveform.slash"
+        case .requestingToken,
+             .connecting:
+            return "waveform.low"
+        case .connected:
+            return "waveform.mid"
+        case .failed:
+            return "waveform.badge.exclamationmark"
+        }
+    }
 
     var isLiveKitStatusError: Bool {
         if case .failed = liveKitConnectionState {

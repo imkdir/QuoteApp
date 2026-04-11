@@ -23,9 +23,9 @@ struct ReviewStatusButton: View {
         var systemImage: String {
             switch self {
             case .reviewing:
-                return "arrow.down.message.fill"
-            case .reviewedInfo:
                 return "ellipsis.message.fill"
+            case .reviewedInfo:
+                return "message.badge.filled.fill"
             case .reviewedPerfect:
                 return "checkmark.message.fill"
             case .unavailable:

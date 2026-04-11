@@ -12,8 +12,10 @@ struct TutorFeedbackSheet: View {
                 .font(.body)
                 .foregroundStyle(.secondary)
 
-            if analysis.state == .info, !analysis.markedNormalizedTokens.isEmpty {
-                Divider()
+            Divider()
+                .opacity(showDetails ? 1 : 0)
+            
+            if showDetails {
 
                 Text("Words to retry")
                     .font(.subheadline.weight(.semibold))
@@ -25,7 +27,11 @@ struct TutorFeedbackSheet: View {
 
             Spacer(minLength: 0)
         }
-        .padding(24)
+        .padding(.init(top: 40, leading: 20, bottom: 20, trailing: 20))
+    }
+    
+    private var showDetails: Bool {
+        analysis.state == .info && analysis.markedNormalizedTokens.isEmpty
     }
 
     private var titleText: String {
