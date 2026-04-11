@@ -47,6 +47,7 @@ class StartPracticeSessionResponse(BaseModel):
     livekit_room: Optional[str] = None
     tutor_identity: Optional[str] = None
     tutor_status: Optional[str] = None
+    tutor_playback_identity: Optional[str] = None
     latest_attempt_id: Optional[str] = None
     latest_result_state: Optional[AnalysisState] = None
 
@@ -67,3 +68,4 @@ class TutorPlaybackCommandResponse(BaseModel):
     session_id: str
     status: str
     message: Optional[str] = None
+    tutor_playback_identity: Optional[str] = None

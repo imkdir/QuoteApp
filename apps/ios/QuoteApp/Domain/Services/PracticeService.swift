@@ -5,6 +5,7 @@ struct PracticeSessionStart {
     let quoteID: String
     let latestAttemptID: String?
     let latestResultState: AnalysisState?
+    let tutorPlaybackIdentity: String?
 }
 
 struct PracticeLatestResult {
@@ -21,6 +22,15 @@ struct PracticeAttemptSubmission {
     let attemptID: String
     let recordingReference: String
     let state: AnalysisState
+}
+
+struct TutorPlaybackAudioArtifact {
+    let sessionID: String
+    let playbackIdentity: String
+    let wordCount: Int
+    let estimatedDurationSeconds: TimeInterval?
+    let rhythmWordEndTimes: [TimeInterval]
+    let audioData: Data
 }
 
 struct PracticeService {
@@ -68,12 +78,14 @@ struct PracticeService {
         let quoteID: String
         let latestAttemptID: String?
         let latestResultStateRaw: String?
+        let tutorPlaybackIdentityRaw: String?
 
         enum CodingKeys: String, CodingKey {
             case sessionID = "session_id"
             case quoteID = "quote_id"
             case latestAttemptID = "latest_attempt_id"
             case latestResultStateRaw = "latest_result_state"
+            case tutorPlaybackIdentityRaw = "tutor_playback_identity"
         }
     }
 
@@ -127,11 +139,13 @@ struct PracticeService {
         let sessionID: String
         let status: String
         let message: String?
+        let tutorPlaybackIdentityRaw: String?
 
         enum CodingKeys: String, CodingKey {
             case sessionID = "session_id"
             case status
             case message
+            case tutorPlaybackIdentityRaw = "tutor_playback_identity"
         }
     }
 
@@ -169,7 +183,8 @@ struct PracticeService {
                 sessionID: dto.sessionID,
                 quoteID: dto.quoteID,
                 latestAttemptID: dto.latestAttemptID,
-                latestResultState: mappedState
+                latestResultState: mappedState,
+                tutorPlaybackIdentity: dto.tutorPlaybackIdentityRaw
             )
         } catch {
             throw PracticeServiceError.decodingFailed
@@ -234,6 +249,64 @@ struct PracticeService {
         } catch {
             throw PracticeServiceError.decodingFailed
         }
+    }
+
+    func fetchTutorPlaybackAudioArtifact(sessionID: String) async throws -> TutorPlaybackAudioArtifact {
+        let endpoint = baseURL
+            .appendingPathComponent("practice")
+            .appendingPathComponent("session")
+            .appendingPathComponent(sessionID)
+            .appendingPathComponent("tutor")
+            .appendingPathComponent("audio")
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "GET"
+        request.setValue("audio/wav", forHTTPHeaderField: "Accept")
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            let nsError = error as NSError
+            throw PracticeServiceError.requestFailed(
+                nsError.localizedFailureReason ?? nsError.localizedDescription
+            )
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PracticeServiceError.invalidHTTPResponse
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw PracticeServiceError.badStatusCode(
+                httpResponse.statusCode,
+                extractBackendDetail(from: data)
+            )
+        }
+
+        guard
+            let playbackIdentity = httpResponse.value(forHTTPHeaderField: "X-QuoteApp-Playback-Identity"),
+            !playbackIdentity.isEmpty
+        else {
+            throw PracticeServiceError.decodingFailed
+        }
+
+        let wordCount = Int(httpResponse.value(forHTTPHeaderField: "X-QuoteApp-Word-Count") ?? "") ?? 0
+        let estimatedDurationSeconds = Double(
+            httpResponse.value(forHTTPHeaderField: "X-QuoteApp-Estimated-Duration-Sec") ?? ""
+        )
+        let rhythmWordEndTimes = decodeRhythmWordEndTimes(
+            from: httpResponse.value(forHTTPHeaderField: "X-QuoteApp-Rhythm-B64")
+        )
+
+        return TutorPlaybackAudioArtifact(
+            sessionID: sessionID,
+            playbackIdentity: playbackIdentity,
+            wordCount: max(0, wordCount),
+            estimatedDurationSeconds: estimatedDurationSeconds,
+            rhythmWordEndTimes: rhythmWordEndTimes,
+            audioData: data
+        )
     }
 
     func stopTutorPlayback(sessionID: String) async throws {
@@ -354,5 +427,43 @@ struct PracticeService {
         }
 
         return nil
+    }
+
+    private func decodeRhythmWordEndTimes(from encodedValue: String?) -> [TimeInterval] {
+        guard let encodedValue, !encodedValue.isEmpty else {
+            return []
+        }
+
+        let padded = paddedBase64URLString(encodedValue)
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        guard let decodedData = Data(base64Encoded: padded) else {
+            return []
+        }
+
+        guard let decoded = try? JSONDecoder().decode([Double].self, from: decodedData) else {
+            return []
+        }
+
+        var last: TimeInterval = 0
+        return decoded.compactMap { raw in
+            guard raw.isFinite else {
+                return nil
+            }
+            let clamped = max(0, raw)
+            guard clamped >= last else {
+                return nil
+            }
+            last = clamped
+            return clamped
+        }
+    }
+
+    private func paddedBase64URLString(_ value: String) -> String {
+        let remainder = value.count % 4
+        guard remainder != 0 else {
+            return value
+        }
+        return value + String(repeating: "=", count: 4 - remainder)
     }
 }

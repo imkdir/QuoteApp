@@ -39,6 +39,7 @@ struct PlaybackActionButton: View {
     }
 
     let mode: Mode
+    let isDisabled: Bool
     let action: () -> Void
 
     var body: some View {
@@ -50,6 +51,7 @@ struct PlaybackActionButton: View {
         .buttonStyle(.borderedProminent)
         .tint(.gray.opacity(0.2))
         .foregroundStyle(.blue)
+        .disabled(isDisabled)
         .accessibilityLabel(mode.title)
         .accessibilityHint(mode.accessibilityHint)
     }
@@ -59,15 +61,15 @@ struct PlaybackActionButton: View {
 struct PlaybackActionButton_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            PlaybackActionButton(mode: .pause, action: {})
+            PlaybackActionButton(mode: .pause, isDisabled: false, action: {})
                 .padding()
                 .previewDisplayName("Pause")
 
-            PlaybackActionButton(mode: .play, action: {})
+            PlaybackActionButton(mode: .play, isDisabled: false, action: {})
                 .padding()
                 .previewDisplayName("Play")
 
-            PlaybackActionButton(mode: .repeatPlayback, action: {})
+            PlaybackActionButton(mode: .repeatPlayback, isDisabled: false, action: {})
                 .padding()
                 .previewDisplayName("Repeat")
         }

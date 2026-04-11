@@ -42,6 +42,7 @@
 		C1198E75EB29BE0F6ED2E9D7 /* PracticeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B571FDB007778AC684499F /* PracticeService.swift */; };
 		D4A30EA59D786DA5D2CF86A9 /* StartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39EAA8D86FE959FD98006578 /* StartView.swift */; };
 		D65A66077477775F9276ECED /* AudioSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509BE7F9AE9B6A91D3EEFCED /* AudioSessionManager.swift */; };
+		E9267D495C034ED68FB97317 /* TutorAudioCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC72F834D4FE43BDBDB5980D /* TutorAudioCache.swift */; };
 		F466DF236AC5628F06C1218F /* MockQuotes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08BFAFFE3C583FD52AB1819D /* MockQuotes.swift */; };
 		F5F3E781168C949E16AF81ED /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D63016FB60A361E4497160 /* RecordingState.swift */; };
 		F8A3B9E96CA479D13FE57F5F /* AnalysisPollingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CD945E4C33759367468191 /* AnalysisPollingService.swift */; };
@@ -78,6 +79,7 @@
 		A6777E4D7C91EE4B9B8A6946 /* MainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewModel.swift; sourceTree = "<group>"; };
 		AB68EB47D1CF9AA11E70040A /* RecordingInputToolbarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingInputToolbarState.swift; sourceTree = "<group>"; };
 		B31840349442F6F35D003E32 /* RecordingWaveformField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingWaveformField.swift; sourceTree = "<group>"; };
+		BC72F834D4FE43BDBDB5980D /* TutorAudioCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorAudioCache.swift; sourceTree = "<group>"; };
 		BBF2508AF11587E8F6286B36 /* TutorPlaybackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorPlaybackManager.swift; sourceTree = "<group>"; };
 		BCA015C3E3B3DABA8D33BBD0 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		CBDDD2296983E1EF93CB4A54 /* QuoteApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QuoteApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -242,6 +244,7 @@
 			children = (
 				509BE7F9AE9B6A91D3EEFCED /* AudioSessionManager.swift */,
 				E4AC2D1C18A422778B43D461 /* PlaybackTimingCoordinator.swift */,
+				BC72F834D4FE43BDBDB5980D /* TutorAudioCache.swift */,
 				BBF2508AF11587E8F6286B36 /* TutorPlaybackManager.swift */,
 				8B822AFE52F53F3DBBA85B3C /* UserRecordingManager.swift */,
 			);
@@ -383,6 +386,7 @@
 				B8010A054195B4FA2AD34F68 /* ReviewStatusButton.swift in Sources */,
 				806072C09A59D9E510DA37A6 /* RootView.swift in Sources */,
 				D4A30EA59D786DA5D2CF86A9 /* StartView.swift in Sources */,
+				E9267D495C034ED68FB97317 /* TutorAudioCache.swift in Sources */,
 				6E0F564513962A3495EE2394 /* TutorFeedbackSheet.swift in Sources */,
 				9C0751BDE2816183E7510B28 /* TutorPlaybackManager.swift in Sources */,
 				7919275E1CBB9DFA408B22A0 /* UserRecordingManager.swift in Sources */,

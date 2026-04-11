@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ActionStackView: View {
     let toolbarState: ActionToolbarState
+    let isPlaybackButtonDisabled: Bool
     let recordingWaveformLevels: [CGFloat]
     let onPlaybackTapped: () -> Void
     let onRecordTapped: () -> Void
@@ -23,7 +24,11 @@ struct ActionStackView: View {
     private var standardLayout: some View {
         HStack(alignment: .center, spacing: 12) {
             if let playbackMode = toolbarState.playbackMode {
-                PlaybackActionButton(mode: playbackMode, action: onPlaybackTapped)
+                PlaybackActionButton(
+                    mode: playbackMode,
+                    isDisabled: isPlaybackButtonDisabled,
+                    action: onPlaybackTapped
+                )
             }
 
             if toolbarState.showsRecordButton {
@@ -188,6 +193,7 @@ struct ActionStackView_Previews: PreviewProvider {
     ) -> some View {
         ActionStackView(
             toolbarState: toolbarState,
+            isPlaybackButtonDisabled: false,
             recordingWaveformLevels: [0.1, 0.15, 0.2, 0.35, 0.5, 0.3, 0.45, 0.22, 0.18, 0.12, 0.4, 0.55, 0.3, 0.2, 0.16, 0.12],
             onPlaybackTapped: {},
             onRecordTapped: {},

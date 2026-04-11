@@ -9,6 +9,7 @@ struct AppEnvironment {
     let audioSessionManager: AudioSessionManager
     let userRecordingManager: UserRecordingManager
     let tutorPlaybackManager: TutorPlaybackManager
+    let tutorAudioCache: TutorAudioCache
 
     @MainActor
     static var runtime: AppEnvironment {
@@ -34,7 +35,8 @@ struct AppEnvironment {
             liveKitSessionManager: LiveKitSessionManager(tokenProvider: tokenProvider),
             audioSessionManager: AudioSessionManager(),
             userRecordingManager: UserRecordingManager(),
-            tutorPlaybackManager: TutorPlaybackManager()
+            tutorPlaybackManager: TutorPlaybackManager(),
+            tutorAudioCache: TutorAudioCache()
         )
     }
 }

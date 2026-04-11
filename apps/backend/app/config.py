@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     tutor_tts_gemini_voice: str = "Kore"
     tutor_tts_speed: float = 1.0
     tutor_tts_timeout_seconds: float = 30.0
+    tutor_tts_style_version: str = "quote_reader_v1"
     openai_api_key: Optional[str] = None
     openai_base_url: str = "https://api.openai.com/v1"
     gemini_api_key: Optional[str] = None
@@ -79,7 +80,6 @@ class Settings(BaseSettings):
         """Returns Gemini base URL without trailing slash."""
 
         return self.gemini_base_url.rstrip("/")
-
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

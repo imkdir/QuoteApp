@@ -50,6 +50,9 @@
   - backend strips wrapper-only markdown artifacts before synthesis
   - backend picks TTS provider from available credentials (`OPENAI_API_KEY` or `GEMINI_API_KEY`) when `TUTOR_TTS_PROVIDER=auto`
   - voice/model are configurable via `TUTOR_TTS_PROVIDER`, `TUTOR_TTS_MODEL`, `TUTOR_TTS_VOICE`
+  - duplicate Play requests while a tutor playback job is already running are ignored
+  - playback startup latency stages are logged (request, audio ready, room connect/publish, first audio frame, started event)
+  - startup path avoids blocking on script metadata publish and uses reduced preroll buffering
 - Learner audio submission:
   - `POST /practice/session/{session_id}/attempt/submit` with raw bytes (`application/octet-stream`)
   - backend stores audio under temp directory `quoteapp-submissions/<session_id>/`

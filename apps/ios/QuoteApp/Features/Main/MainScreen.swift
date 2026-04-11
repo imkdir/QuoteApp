@@ -72,6 +72,7 @@ struct MainScreen: View {
 
             ActionStackView(
                 toolbarState: viewModel.actionToolbarState,
+                isPlaybackButtonDisabled: viewModel.isTutorAudioDownloadInFlight,
                 recordingWaveformLevels: viewModel.recordingWaveformLevels,
                 onPlaybackTapped: viewModel.playbackTapped,
                 onRecordTapped: viewModel.recordTapped,

@@ -1,8 +1,9 @@
+import AVFoundation
 import Combine
 import Foundation
 
 @MainActor
-final class TutorPlaybackManager: ObservableObject {
+final class TutorPlaybackManager: NSObject, ObservableObject {
     enum SessionBridgeState: Equatable {
         case idle
         case waitingForConnection
@@ -10,15 +11,46 @@ final class TutorPlaybackManager: ObservableObject {
         case failed(message: String)
     }
 
+    enum ActivePlaybackSource: Equatable {
+        case none
+        case backendStream
+        case localCachedArtifact
+    }
+
+    enum PlaybackError: LocalizedError {
+        case invalidLocalAudioFile
+        case playbackStartFailed
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidLocalAudioFile:
+                return "Cached tutor audio file is invalid."
+            case .playbackStartFailed:
+                return "Could not start cached tutor audio playback."
+            }
+        }
+    }
+
     @Published private(set) var bridgeState: SessionBridgeState = .idle
     @Published private(set) var playbackState: PlaybackState
+    @Published private(set) var activePlaybackSource: ActivePlaybackSource = .none
 
     private let timingCoordinator: PlaybackTimingCoordinator
+    private var audioPlayer: AVAudioPlayer?
+
+    var isUsingLocalAudio: Bool {
+        activePlaybackSource == .localCachedArtifact
+    }
+
+    var isUsingBackendStream: Bool {
+        activePlaybackSource == .backendStream
+    }
 
     init(timingCoordinator: PlaybackTimingCoordinator? = nil) {
         let coordinator = timingCoordinator ?? PlaybackTimingCoordinator()
         self.timingCoordinator = coordinator
         self.playbackState = .idle(totalWordCount: coordinator.progress.totalWordCount)
+        super.init()
 
         coordinator.onProgress = { [weak self] progress in
             guard let self else {
@@ -44,6 +76,8 @@ final class TutorPlaybackManager: ObservableObject {
 
     func prepareForQuote(wordCount: Int, quoteText: String?) {
         _ = quoteText
+        stopLocalAudioPlayback()
+        activePlaybackSource = .none
         timingCoordinator.reset(totalWordCount: wordCount)
         playbackState = .idle(totalWordCount: max(0, wordCount))
     }
@@ -52,6 +86,8 @@ final class TutorPlaybackManager: ObservableObject {
         wordCount: Int,
         estimatedDurationSeconds: TimeInterval?
     ) {
+        stopLocalAudioPlayback()
+        activePlaybackSource = .backendStream
         let clampedWordCount = max(0, wordCount)
         playbackState = .playing(
             progress: PlaybackProgress(spokenWordCount: 0, totalWordCount: clampedWordCount)
@@ -63,7 +99,50 @@ final class TutorPlaybackManager: ObservableObject {
         )
     }
 
+    func beginPlaybackFromCachedAudioFile(
+        fileURL: URL,
+        wordCount: Int,
+        estimatedDurationSeconds: TimeInterval?,
+        rhythmWordEndTimes: [TimeInterval]
+    ) throws {
+        stopLocalAudioPlayback()
+
+        let player: AVAudioPlayer
+        do {
+            player = try AVAudioPlayer(contentsOf: fileURL)
+        } catch {
+            throw PlaybackError.invalidLocalAudioFile
+        }
+
+        player.delegate = self
+        player.currentTime = 0
+        player.prepareToPlay()
+        guard player.play() else {
+            throw PlaybackError.playbackStartFailed
+        }
+
+        audioPlayer = player
+        activePlaybackSource = .localCachedArtifact
+
+        let clampedWordCount = max(0, wordCount)
+        playbackState = .playing(
+            progress: PlaybackProgress(spokenWordCount: 0, totalWordCount: clampedWordCount)
+        )
+        timingCoordinator.startFromBeginning(
+            totalWordCount: clampedWordCount,
+            expectedDurationSeconds: normalizedExpectedDuration(
+                preferredDuration: estimatedDurationSeconds,
+                fallbackPlayerDuration: player.duration
+            ),
+            completionBehavior: .waitForExplicitFinish,
+            startDelaySeconds: 0,
+            wordEndTimes: rhythmWordEndTimes
+        )
+    }
+
     func beginLocalDevelopmentFallbackPlayback(wordCount: Int) {
+        stopLocalAudioPlayback()
+        activePlaybackSource = .none
         let clampedWordCount = max(0, wordCount)
         playbackState = .playing(
             progress: PlaybackProgress(spokenWordCount: 0, totalWordCount: clampedWordCount)
@@ -76,6 +155,10 @@ final class TutorPlaybackManager: ObservableObject {
     }
 
     func pauseFromBackendStop() {
+        if activePlaybackSource == .localCachedArtifact {
+            audioPlayer?.pause()
+        }
+
         timingCoordinator.pause()
         switch playbackState {
         case .playing, .paused:
@@ -86,6 +169,8 @@ final class TutorPlaybackManager: ObservableObject {
     }
 
     func markFinishedAtEndFromBackend() {
+        stopLocalAudioPlayback()
+        activePlaybackSource = .none
         timingCoordinator.finishAtEnd()
         playbackState = .finishedAtEnd(progress: timingCoordinator.progress)
     }
@@ -99,6 +184,8 @@ final class TutorPlaybackManager: ObservableObject {
             return
         }
 
+        stopLocalAudioPlayback()
+        activePlaybackSource = .none
         timingCoordinator.finishAtEnd()
         playbackState = .finishedAtEnd(progress: timingCoordinator.progress)
     }
@@ -113,6 +200,58 @@ final class TutorPlaybackManager: ObservableObject {
             bridgeState = .ready
         case let .failed(message):
             bridgeState = .failed(message: message)
+        }
+    }
+
+    private func stopLocalAudioPlayback() {
+        audioPlayer?.stop()
+        audioPlayer = nil
+    }
+
+    private func normalizedExpectedDuration(
+        preferredDuration: TimeInterval?,
+        fallbackPlayerDuration: TimeInterval
+    ) -> TimeInterval? {
+        if let preferredDuration, preferredDuration > 0 {
+            return preferredDuration
+        }
+
+        return fallbackPlayerDuration > 0 ? fallbackPlayerDuration : nil
+    }
+}
+
+extension TutorPlaybackManager: AVAudioPlayerDelegate {
+    nonisolated func audioPlayerDidFinishPlaying(
+        _ player: AVAudioPlayer,
+        successfully flag: Bool
+    ) {
+        _ = flag
+        Task { @MainActor [weak self] in
+            guard let self, player === self.audioPlayer else {
+                return
+            }
+
+            self.audioPlayer = nil
+            self.activePlaybackSource = .none
+            self.timingCoordinator.finishAtEnd()
+            self.playbackState = .finishedAtEnd(progress: self.timingCoordinator.progress)
+        }
+    }
+
+    nonisolated func audioPlayerDecodeErrorDidOccur(
+        _ player: AVAudioPlayer,
+        error: Error?
+    ) {
+        _ = error
+        Task { @MainActor [weak self] in
+            guard let self, player === self.audioPlayer else {
+                return
+            }
+
+            self.audioPlayer = nil
+            self.activePlaybackSource = .none
+            self.timingCoordinator.pause()
+            self.playbackState = .paused(progress: self.timingCoordinator.progress)
         }
     }
 }

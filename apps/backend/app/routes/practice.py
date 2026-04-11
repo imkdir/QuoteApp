@@ -1,6 +1,9 @@
 """Practice session APIs for mock-backed session and latest-result integration."""
 
-from fastapi import APIRouter, Body, Header, HTTPException, Query, status
+import base64
+import json
+import logging
+from fastapi import APIRouter, Body, Header, HTTPException, Query, Response, status
 from typing import Optional
 
 from app.agents.speaking_tutor_agent import SpeakingTutorAgentRuntime
@@ -23,6 +26,7 @@ from app.services.result_service import LatestAttemptResultResponse, build_lates
 
 router = APIRouter(prefix="/practice", tags=["practice"])
 _TUTOR_RUNTIME = SpeakingTutorAgentRuntime()
+logger = logging.getLogger(__name__)
 
 
 def _sync_tutor_status(session_id: str) -> None:
@@ -54,10 +58,19 @@ def start_practice_session(
     )
     tutor_context = _TUTOR_RUNTIME.ensure_session_tutor(
         session_id=session.session_id,
+        quote_id=session.quote_id,
         room_name=session.livekit_room,
         quote_text=session.quote_text or "",
         settings=settings,
     )
+    tutor_playback_identity: Optional[str] = None
+    try:
+        tutor_playback_identity = _TUTOR_RUNTIME.playback_identity_for_session(
+            session_id=session.session_id,
+            settings=settings,
+        )
+    except RuntimeError:
+        tutor_playback_identity = None
     update_tutor_status(
         session_id=session.session_id,
         status=tutor_context.status,
@@ -72,6 +85,7 @@ def start_practice_session(
         livekit_room=session.livekit_room,
         tutor_identity=session.tutor_identity,
         tutor_status=tutor_context.status,
+        tutor_playback_identity=tutor_playback_identity,
         latest_attempt_id=latest_attempt.attempt_id if latest_attempt else None,
         latest_result_state=(
             latest_attempt.review_result.state
@@ -187,8 +201,7 @@ def play_tutor_quote(session_id: str) -> TutorPlaybackCommandResponse:
     """Triggers backend tutor playback as room audio for the selected session quote."""
 
     settings = get_settings()
-    context = _TUTOR_RUNTIME.context_for_session(session_id)
-    if context is None:
+    if _TUTOR_RUNTIME.context_for_session(session_id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
@@ -217,10 +230,80 @@ def play_tutor_quote(session_id: str) -> TutorPlaybackCommandResponse:
             },
         ) from exc
 
+    tutor_playback_identity: Optional[str] = None
+    try:
+        tutor_playback_identity = _TUTOR_RUNTIME.playback_identity_for_session(
+            session_id=session_id,
+            settings=settings,
+        )
+    except RuntimeError:
+        tutor_playback_identity = None
+
     return TutorPlaybackCommandResponse(
         session_id=session_id,
         status="playing",
         message="Tutor playback requested.",
+        tutor_playback_identity=tutor_playback_identity,
+    )
+
+
+@router.get(
+    "/session/{session_id}/tutor/audio",
+)
+def get_tutor_quote_audio_artifact(session_id: str) -> Response:
+    """Returns backend-generated tutor quote audio artifact for device cache reuse."""
+
+    settings = get_settings()
+    context = _TUTOR_RUNTIME.context_for_session(session_id)
+    if context is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "session_not_found",
+                "message": f"Session not found: {session_id}",
+            },
+        )
+
+    try:
+        artifact = _TUTOR_RUNTIME.build_tutor_audio_artifact(
+            session_id=session_id,
+            settings=settings,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "tutor_audio_unavailable",
+                "message": str(exc),
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 - runtime boundary
+        logger.exception("Unexpected tutor audio artifact failure for session %s", session_id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "tutor_audio_unavailable",
+                "message": f"backend tutor audio unavailable: {exc}",
+            },
+        ) from exc
+
+    headers = {
+        "X-QuoteApp-Playback-Identity": artifact.playback_identity,
+        "X-QuoteApp-Word-Count": str(max(0, artifact.word_count)),
+        "X-QuoteApp-Estimated-Duration-Sec": f"{max(0.0, artifact.estimated_duration_sec):.4f}",
+        "X-QuoteApp-Rhythm-B64": base64.urlsafe_b64encode(
+            json.dumps(
+                artifact.rhythm_word_end_times,
+                ensure_ascii=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).decode("ascii"),
+        "Cache-Control": "private, max-age=86400",
+    }
+    return Response(
+        content=artifact.wav_bytes,
+        media_type="audio/wav",
+        headers=headers,
     )
 
 

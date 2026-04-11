@@ -31,6 +31,7 @@ final class LiveKitSessionManager: NSObject, ObservableObject {
 #if canImport(LiveKit)
     private let room: Room
     private var tutorAudioPublications: [Track.Sid: RemoteTrackPublication] = [:]
+    private let tutorAudioReadyTopic = "quoteapp.tutor.audio.ready"
 #endif
 
     init(tokenProvider: any LiveKitTokenProviding) {
@@ -151,6 +152,38 @@ final class LiveKitSessionManager: NSObject, ObservableObject {
         tutorAudioPublications.removeAll()
     }
 
+    private func publishTutorAudioReady(
+        publication: RemoteTrackPublication,
+        from participant: RemoteParticipant
+    ) async {
+        guard publication.kind == .audio else {
+            return
+        }
+
+        guard isTutorParticipant(participant) else {
+            return
+        }
+
+        let payload: [String: String] = [
+            "publication_sid": publication.sid.stringValue
+        ]
+        guard let encoded = try? JSONSerialization.data(withJSONObject: payload) else {
+            return
+        }
+
+        do {
+            try await room.localParticipant.publish(
+                data: encoded,
+                options: DataPublishOptions(
+                    topic: tutorAudioReadyTopic,
+                    reliable: true
+                )
+            )
+        } catch {
+            return
+        }
+    }
+
     private func isTutorParticipant(_ participant: RemoteParticipant?) -> Bool {
         guard let identity = participant?.identity?.stringValue else {
             return false
@@ -210,6 +243,17 @@ extension LiveKitSessionManager: RoomDelegate {
     ) {
         Task { @MainActor in
             await rememberTutorAudioPublication(publication: publication, from: participant)
+        }
+    }
+
+    nonisolated func room(
+        _ room: Room,
+        participant: RemoteParticipant,
+        didSubscribeTrack publication: RemoteTrackPublication
+    ) {
+        _ = room
+        Task { @MainActor in
+            await publishTutorAudioReady(publication: publication, from: participant)
         }
     }
 

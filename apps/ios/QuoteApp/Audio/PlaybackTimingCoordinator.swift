@@ -16,7 +16,7 @@ final class PlaybackTimingCoordinator {
         static let `default` = Configuration(
             wordsPerSecond: 2.9,
             tickInterval: 0.12,
-            backendStartDelaySeconds: 0.12
+            backendStartDelaySeconds: 0.04
         )
     }
 
@@ -30,6 +30,7 @@ final class PlaybackTimingCoordinator {
     private var elapsedBeforeCurrentRun: TimeInterval = 0
     private var activeWordsPerSecond: Double
     private var startDelaySeconds: TimeInterval = 0
+    private var customWordEndTimes: [TimeInterval]?
     private var completionBehavior: CompletionBehavior = .waitForExplicitFinish
 
     init(configuration: Configuration = .default) {
@@ -44,6 +45,7 @@ final class PlaybackTimingCoordinator {
         elapsedBeforeCurrentRun = 0
         activeWordsPerSecond = configuration.wordsPerSecond
         startDelaySeconds = 0
+        customWordEndTimes = nil
         completionBehavior = .waitForExplicitFinish
         progress = PlaybackProgress(spokenWordCount: 0, totalWordCount: totalWordCount)
         onProgress?(progress)
@@ -53,7 +55,8 @@ final class PlaybackTimingCoordinator {
         totalWordCount: Int,
         expectedDurationSeconds: TimeInterval? = nil,
         completionBehavior: CompletionBehavior = .waitForExplicitFinish,
-        startDelaySeconds: TimeInterval? = nil
+        startDelaySeconds: TimeInterval? = nil,
+        wordEndTimes: [TimeInterval]? = nil
     ) {
         stopTicker()
         runStartDate = nil
@@ -65,6 +68,10 @@ final class PlaybackTimingCoordinator {
             startDelaySeconds ?? (
                 completionBehavior == .waitForExplicitFinish ? configuration.backendStartDelaySeconds : 0
             )
+        )
+        self.customWordEndTimes = sanitizedWordEndTimes(
+            wordEndTimes,
+            expectedWordCount: totalWordCount
         )
         activeWordsPerSecond = wordsPerSecond(
             totalWordCount: totalWordCount,
@@ -133,7 +140,15 @@ final class PlaybackTimingCoordinator {
 
         let elapsed = elapsedBeforeCurrentRun + now.timeIntervalSince(runStartDate)
         let effectiveElapsed = max(0, elapsed - startDelaySeconds)
-        let rawSpokenWordCount = Int(floor(effectiveElapsed * activeWordsPerSecond))
+        let rawSpokenWordCount: Int
+        if let customWordEndTimes {
+            rawSpokenWordCount = spokenWordCount(
+                forElapsed: effectiveElapsed,
+                wordEndTimes: customWordEndTimes
+            )
+        } else {
+            rawSpokenWordCount = Int(floor(effectiveElapsed * activeWordsPerSecond))
+        }
         let maxSpokenWordCount: Int
         switch completionBehavior {
         case .waitForExplicitFinish:
@@ -177,5 +192,49 @@ final class PlaybackTimingCoordinator {
 
         let derivedWordsPerSecond = Double(totalWordCount) / expectedDurationSeconds
         return max(0.1, derivedWordsPerSecond)
+    }
+
+    private func spokenWordCount(
+        forElapsed elapsed: TimeInterval,
+        wordEndTimes: [TimeInterval]
+    ) -> Int {
+        guard !wordEndTimes.isEmpty else {
+            return 0
+        }
+
+        var lower = 0
+        var upper = wordEndTimes.count
+
+        while lower < upper {
+            let midpoint = lower + (upper - lower) / 2
+            if wordEndTimes[midpoint] <= elapsed {
+                lower = midpoint + 1
+            } else {
+                upper = midpoint
+            }
+        }
+
+        return lower
+    }
+
+    private func sanitizedWordEndTimes(
+        _ candidate: [TimeInterval]?,
+        expectedWordCount: Int
+    ) -> [TimeInterval]? {
+        guard let candidate,
+              candidate.count == expectedWordCount,
+              expectedWordCount > 0 else {
+            return nil
+        }
+
+        var previous: TimeInterval = 0
+        for checkpoint in candidate {
+            guard checkpoint.isFinite, checkpoint >= 0, checkpoint >= previous else {
+                return nil
+            }
+            previous = checkpoint
+        }
+
+        return candidate
     }
 }
