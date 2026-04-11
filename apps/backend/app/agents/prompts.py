@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 _MARKDOWN_FENCE_PATTERN = re.compile(r"^\s*```")
 _MARKDOWN_BLOCKQUOTE_PATTERN = re.compile(r"^\s*>\s?")
 _ZERO_WIDTH_CHARS = str.maketrans("", "", "\ufeff\u200b\u200c\u200d")
+_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9]+(?:['’‘`][A-Za-z0-9]+)*")
+_MAX_INFO_FEEDBACK_WORDS = 140
 
 
 def build_tutor_quote_script(*, quote_text: str) -> str:
@@ -95,14 +98,45 @@ def _all_non_empty_lines_are_blockquotes(lines: list[str]) -> bool:
     return all(_MARKDOWN_BLOCKQUOTE_PATTERN.match(line) for line in non_empty)
 
 
-def build_info_feedback(*, marked_words: list[str]) -> str:
-    """Returns concise corrective feedback for info results."""
+def build_info_feedback(
+    *,
+    quote_text: Optional[str] = None,
+    transcript_text: Optional[str] = None,
+    marked_words: list[str],
+    mismatch_pattern: Optional[str] = None,
+    confidence: Optional[float] = None,
+) -> str:
+    """Returns grounded, concise tutor feedback for info results."""
 
-    if not marked_words:
-        return "Good attempt. Try again with clearer pronunciation."
+    focus_words = _dedup_words(marked_words, limit=2)
+    focus_phrase = _focus_phrase(focus_words)
+    quote_token_count = _count_tokens(quote_text)
+    transcript_token_count = _count_tokens(transcript_text)
+    approx_feedback = confidence is not None and confidence < 0.45
 
-    focus = ", ".join(marked_words[:2])
-    return f"Good attempt. Focus on: {focus}."
+    if approx_feedback:
+        opening = "Some parts did not align cleanly with the quote, so this is an approximate pass."
+    elif mismatch_pattern == "single-word slip" and focus_phrase:
+        opening = f"Your attempt was mostly clear, with one likely slip around {focus_phrase}."
+    elif mismatch_pattern == "short cluster mismatch" and focus_phrase:
+        opening = f"Your pacing was mostly steady, but the section around {focus_phrase} needs cleaner articulation."
+    elif mismatch_pattern == "phrase-level drift":
+        opening = "A full phrase drifted away from the quote in this attempt."
+    elif mismatch_pattern == "widespread mismatch":
+        opening = "Several words did not align clearly with the quote."
+    elif focus_phrase:
+        opening = f"Good effort, but the pronunciation around {focus_phrase} needs another pass."
+    else:
+        opening = "Good effort, but a few words were unclear."
+
+    suggestion = _next_attempt_suggestion(
+        quote_text=quote_text or "",
+        quote_token_count=quote_token_count,
+        transcript_token_count=transcript_token_count,
+        mismatch_pattern=mismatch_pattern,
+    )
+    feedback = f"{opening} On your next attempt, {suggestion}."
+    return _truncate_to_word_limit(feedback, max_words=_MAX_INFO_FEEDBACK_WORDS)
 
 
 def build_perfect_feedback() -> str:
@@ -116,3 +150,70 @@ def build_unavailable_feedback(*, reason: str) -> str:
 
     clean_reason = reason.strip() or "review could not be completed"
     return f"Review unavailable: {clean_reason}."
+
+
+def _dedup_words(words: list[str], *, limit: int) -> list[str]:
+    selected: list[str] = []
+    seen: set[str] = set()
+    for word in words:
+        cleaned = word.strip()
+        if not cleaned:
+            continue
+
+        key = cleaned.lower()
+        if key in seen:
+            continue
+
+        seen.add(key)
+        selected.append(cleaned)
+        if len(selected) >= limit:
+            break
+
+    return selected
+
+
+def _focus_phrase(words: list[str]) -> str:
+    if not words:
+        return ""
+    if len(words) == 1:
+        return f"'{words[0]}'"
+    return f"'{words[0]}' and '{words[1]}'"
+
+
+def _count_tokens(text: Optional[str]) -> int:
+    if not text:
+        return 0
+    return len(_TOKEN_PATTERN.findall(text))
+
+
+def _next_attempt_suggestion(
+    *,
+    quote_text: str,
+    quote_token_count: int,
+    transcript_token_count: int,
+    mismatch_pattern: Optional[str],
+) -> str:
+    if quote_token_count and transcript_token_count:
+        ratio = transcript_token_count / quote_token_count
+        if ratio < 0.75:
+            return "slow slightly and keep every small connecting word audible"
+        if ratio > 1.25:
+            return "stay closer to the exact quote wording and avoid adding filler words"
+
+    if mismatch_pattern in {"phrase-level drift", "widespread mismatch"}:
+        if _has_phrase_break_punctuation(quote_text):
+            return "read one phrase at a time and pause briefly at punctuation before continuing"
+        return "read one short phrase at a time, then pause briefly before the next phrase"
+
+    return "keep a steady pace and fully finish each target word before moving on"
+
+
+def _has_phrase_break_punctuation(text: str) -> bool:
+    return any(mark in text for mark in ",;:.!?")
+
+
+def _truncate_to_word_limit(text: str, *, max_words: int) -> str:
+    words = text.split()
+    if len(words) <= max_words:
+        return text
+    return " ".join(words[:max_words]).rstrip(".,;:!?") + "."
