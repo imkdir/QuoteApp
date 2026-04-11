@@ -38,7 +38,7 @@ if [ ! -f "$ENV_FILE" ] && [ -f "$EXAMPLE_ENV_FILE" ]; then
   cp "$EXAMPLE_ENV_FILE" "$ENV_FILE"
   echo ""
   echo "Created apps/backend/.env from .env.example."
-  echo "Update apps/backend/.env with your LiveKit and TTS credentials."
+  echo "Update apps/backend/.env with your LiveKit and AI provider credentials."
 fi
 
 echo ""

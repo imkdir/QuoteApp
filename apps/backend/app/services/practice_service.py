@@ -241,7 +241,7 @@ def _resolve_review_for_attempt(
     try:
         if not tutor_available:
             review_result = unavailable_result(
-                reason=tutor_failure_reason or "tutor agent is unavailable"
+                reason=tutor_failure_reason or "tutor service is unavailable"
             )
         elif not quote_text or not quote_text.strip():
             review_result = unavailable_result(reason="quote context was unavailable")
@@ -269,7 +269,7 @@ def _resolve_review_for_attempt(
     except TranscriptionError as exc:
         review_result = unavailable_result(reason=str(exc))
     except Exception:  # noqa: BLE001 - defensive mapper boundary
-        review_result = unavailable_result(reason="backend review pipeline failed")
+        review_result = unavailable_result(reason="review service failed unexpectedly")
 
     with _SESSIONS_LOCK:
         session = _SESSIONS.get(session_id)

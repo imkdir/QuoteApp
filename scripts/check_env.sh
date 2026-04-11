@@ -34,9 +34,22 @@ for key in LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET; do
   fi
 done
 
+tutor_tts_provider="$(printf '%s' "${TUTOR_TTS_PROVIDER:-auto}" | tr '[:upper:]' '[:lower:]')"
 missing_tts=()
-if [ -z "${OPENAI_API_KEY:-}" ] && [ -z "${GEMINI_API_KEY:-}" ]; then
-  missing_tts+=("OPENAI_API_KEY or GEMINI_API_KEY")
+if [ "$tutor_tts_provider" = "openai" ]; then
+  if [ -z "${OPENAI_API_KEY:-}" ]; then
+    missing_tts+=("OPENAI_API_KEY")
+  fi
+elif [ "$tutor_tts_provider" = "gemini" ]; then
+  if [ -z "${GEMINI_API_KEY:-}" ]; then
+    missing_tts+=("GEMINI_API_KEY")
+  fi
+elif [ "$tutor_tts_provider" = "auto" ]; then
+  if [ -z "${OPENAI_API_KEY:-}" ] && [ -z "${GEMINI_API_KEY:-}" ]; then
+    missing_tts+=("OPENAI_API_KEY or GEMINI_API_KEY")
+  fi
+else
+  missing_tts+=("TUTOR_TTS_PROVIDER must be one of: auto, openai, gemini")
 fi
 
 review_stt_provider="$(printf '%s' "${REVIEW_STT_PROVIDER:-auto}" | tr '[:upper:]' '[:lower:]')"
@@ -65,11 +78,10 @@ else
 fi
 
 if [ ${#missing_tts[@]} -eq 0 ]; then
-  provider="${TUTOR_TTS_PROVIDER:-auto}"
-  echo "[ok] Tutor TTS credentials are present (provider=$provider)."
+  echo "[ok] Tutor TTS credentials are present (provider=$tutor_tts_provider)."
 else
   echo "[missing] Tutor TTS credentials are incomplete."
-  echo "          Set at least one of: ${missing_tts[*]}"
+  echo "          Set: ${missing_tts[*]}"
 fi
 
 if [ ${#missing_review_stt[@]} -eq 0 ]; then

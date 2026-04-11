@@ -81,5 +81,5 @@ def make_superseded_unavailable_result() -> TutorReviewResult:
 
     return TutorReviewResult(
         state=AnalysisState.unavailable,
-        feedback_text="Review was superseded by a newer local recording draft.",
+        feedback_text="Review was skipped because a newer recording was started.",
     )

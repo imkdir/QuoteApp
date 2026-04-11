@@ -85,7 +85,9 @@ def map_transcript_to_review(payload: TranscriptAnalysisInput) -> TutorReviewRes
         quote_token_count=len(quote_tokens),
         transcript_token_count=len(transcript_tokens),
     ):
-        return unavailable_result(reason="analysis could not produce a grounded result")
+        return unavailable_result(
+            reason="the attempt did not match enough of the quote for a reliable review"
+        )
 
     mismatch_evidence = _find_mismatch_evidence(
         quote_tokens=quote_tokens,
@@ -96,7 +98,9 @@ def map_transcript_to_review(payload: TranscriptAnalysisInput) -> TutorReviewRes
         transcript_token_count=len(transcript_tokens),
         matched_quote_indexes=mismatch_evidence.matched_quote_indexes,
     ):
-        return unavailable_result(reason="analysis could not produce a grounded result")
+        return unavailable_result(
+            reason="the attempt did not match enough of the quote for a reliable review"
+        )
 
     marked = mismatch_evidence.marked_tokens
     if not marked:

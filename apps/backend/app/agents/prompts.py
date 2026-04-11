@@ -119,13 +119,13 @@ def build_info_feedback(
     elif mismatch_pattern == "single-word slip" and focus_phrase:
         opening = f"Your attempt was mostly clear, with one likely slip around {focus_phrase}."
     elif mismatch_pattern == "short cluster mismatch" and focus_phrase:
-        opening = f"Your pacing was mostly steady, but the section around {focus_phrase} needs cleaner articulation."
+        opening = f"Your attempt was mostly steady, but the section around {focus_phrase} did not match the quote clearly."
     elif mismatch_pattern == "phrase-level drift":
         opening = "A full phrase drifted away from the quote in this attempt."
     elif mismatch_pattern == "widespread mismatch":
         opening = "Several words did not align clearly with the quote."
     elif focus_phrase:
-        opening = f"Good effort, but the pronunciation around {focus_phrase} needs another pass."
+        opening = f"Good effort, but the wording around {focus_phrase} needs another pass."
     else:
         opening = "Good effort, but a few words were unclear."
 
@@ -142,7 +142,7 @@ def build_info_feedback(
 def build_perfect_feedback() -> str:
     """Returns concise positive feedback for perfect results."""
 
-    return "Nice work. Your pacing and clarity were strong."
+    return "Nice work. This attempt stayed close to the quote text."
 
 
 def build_unavailable_feedback(*, reason: str) -> str:
@@ -196,7 +196,7 @@ def _next_attempt_suggestion(
     if quote_token_count and transcript_token_count:
         ratio = transcript_token_count / quote_token_count
         if ratio < 0.75:
-            return "slow slightly and keep every small connecting word audible"
+            return "slow slightly and include each small connecting word from the quote"
         if ratio > 1.25:
             return "stay closer to the exact quote wording and avoid adding filler words"
 
@@ -205,7 +205,7 @@ def _next_attempt_suggestion(
             return "read one phrase at a time and pause briefly at punctuation before continuing"
         return "read one short phrase at a time, then pause briefly before the next phrase"
 
-    return "keep a steady pace and fully finish each target word before moving on"
+    return "keep a steady pace and stay close to the quote wording from start to finish"
 
 
 def _has_phrase_break_punctuation(text: str) -> bool:

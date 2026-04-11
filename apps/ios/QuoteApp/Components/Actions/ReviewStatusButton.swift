@@ -13,13 +13,13 @@ struct ReviewStatusButton: View {
             case .reviewing:
                 return "Reviewing"
             case .reviewedInfo:
-                return "Reviewed Info"
+                return "Reviewed"
             case .reviewedPerfect:
-                return "Reviewed Perfect"
+                return "Reviewed"
             case .unavailable:
-                return "Unavailable"
+                return "Review unavailable"
             case .reviewedNone:
-                return "Reviewed None"
+                return "No review yet"
             }
         }
 
@@ -81,7 +81,7 @@ struct ReviewStatusButton: View {
         case .reviewedInfo, .reviewedPerfect, .unavailable:
             return "Opens review details"
         case .reviewedNone:
-            return "Nothing reviewed yet"
+            return "No review details are available yet"
         }
     }
 

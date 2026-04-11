@@ -23,21 +23,15 @@ struct ActionStackView: View {
 
     private var standardLayout: some View {
         Group {
-            if let playbackMode = toolbarState.playbackMode {
-                PlaybackActionButton(
-                    mode: playbackMode,
-                    isDisabled: isPlaybackButtonDisabled,
-                    action: onPlaybackTapped
-                )
-            }
+            PlaybackActionButton(
+                mode: toolbarState.playbackMode,
+                isDisabled: isPlaybackButtonDisabled,
+                action: onPlaybackTapped
+            )
 
-            if toolbarState.showsRecordButton {
-                recordButton
-            }
+            recordButton
 
-            if toolbarState.showsReviewButton {
-                ReviewStatusButton(state: toolbarState.reviewState, action: onReviewTapped)
-            }
+            ReviewStatusButton(state: toolbarState.reviewState, action: onReviewTapped)
         }
         .animation(.easeInOut(duration: 0.15), value: toolbarState)
     }

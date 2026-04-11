@@ -250,17 +250,21 @@ These are separate concerns and should not be flattened into one mutually exclus
 Natural toolbar behavior:
 
 * when the learner is **recording** or has a **stopped-but-unsent local draft**, show only recording-related controls in the toolbar
-* when the learner is **not recording** and has no unsent local draft, playback controls should be available based on tutor playback state
-* when nothing blocks review controls, show review controls whenever:
+* when the learner is **not recording** and has no unsent local draft, show the standard three controls together:
 
-  * analysis for the latest attempt is loading, or
-  * there is at least one attempt in session history
+  * playback control (state-driven by tutor playback)
+  * `Record` control
+  * review status control
+* in this non-recording mode, the review status control is always visible:
+
+  * disabled when there is no visible review yet
+  * stateful (`Reviewing`, `Reviewed`, `Unavailable`) when a visible review exists
 
 In other words:
 
 * **recording/send-ready** has toolbar exclusivity
-* **playback** should be available whenever the learner is not in recording/send-ready mode
-* **review** should be available whenever there is an in-progress or completed latest attempt and recording/send-ready mode is not active
+* outside recording/send-ready mode, the toolbar stays in a stable three-control layout (`Playback`, `Record`, `Review`)
+* **review** state still comes from the latest visible attempt review ownership, even though the control remains visible in a disabled state when no review exists
 
 The screen may still display the latest completed review in the quote area or review sheet, because review belongs to session history, not only to the current local draft.
 
@@ -308,7 +312,8 @@ While the recording toolbar is visible:
 
 Show a compact `Review` action or status control with one of:
 
-* `Reviewing` using `arrow.down.message.fill`
+* `No review yet` using `message.fill`
+* `Reviewing` using `message.badge.waveform.fill`
 * `Reviewed` using:
 
   * `checkmark.message.fill` when the result is effectively perfect
@@ -318,10 +323,11 @@ Show a compact `Review` action or status control with one of:
 Behavior:
 
 * `Reviewing` is not tappable
+* `No review yet` is not tappable
 * `Reviewed` is tappable and opens review details if needed
 * `Unavailable` is tappable and explains that review could not be completed via a simple bottom sheet
 * `Reviewed` visually covers both internal `info` and `perfect`, while the app state still distinguishes them
-* show review controls whenever recording/send-ready mode is not active and the latest attempt is either loading or already exists in session history
+* show the review status control whenever recording/send-ready mode is not active; use disabled `No review yet` when no visible review exists
 
 ---
 

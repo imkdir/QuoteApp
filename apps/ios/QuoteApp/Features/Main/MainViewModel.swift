@@ -630,7 +630,7 @@ final class MainViewModel: ObservableObject {
         }
         activeLoadingAttemptID = attemptID
 
-        practiceStatusMessage = "Reviewing latest attempt."
+        practiceStatusMessage = "Reviewing your latest attempt."
         feedbackSheetAnalysis = nil
 
         resultPollingTask?.cancel()
@@ -1238,11 +1238,11 @@ final class MainViewModel: ObservableObject {
     private func statusMessage(for state: AnalysisState) -> String {
         switch state {
         case .loading:
-            return "Reviewing latest attempt."
+            return "Reviewing your latest attempt."
         case .info:
-            return "Reviewed (info): words marked on the quote."
+            return "Review complete. Some words are marked in the quote."
         case .perfect:
-            return "Reviewed (perfect): no marked words."
+            return "Review complete. No words were marked."
         case .unavailable:
             return "Review unavailable."
         }
@@ -1553,11 +1553,11 @@ extension MainViewModel {
     private static func previewStatusMessage(for state: AnalysisState) -> String {
         switch state {
         case .loading:
-            return "Reviewing latest attempt."
+            return "Reviewing your latest attempt."
         case .info:
-            return "Reviewed (info): words marked on the quote."
+            return "Review complete. Some words are marked in the quote."
         case .perfect:
-            return "Reviewed (perfect): no marked words."
+            return "Review complete. No words were marked."
         case .unavailable:
             return "Review unavailable."
         }
@@ -1579,7 +1579,7 @@ extension MainViewModel {
         case .perfect:
             return PracticeAnalysis(
                 state: .perfect,
-                feedbackText: "Great pacing and pronunciation. This attempt sounds clear."
+                feedbackText: "Nice work. This attempt stayed close to the quote text."
             )
         case .unavailable:
             return PracticeAnalysis(

@@ -18,11 +18,7 @@ struct ActionToolbarState: Equatable {
         localRecordingDraftState != nil
     }
 
-    var playbackMode: PlaybackActionButton.Mode? {
-        guard !isInRecordingExclusiveMode else {
-            return nil
-        }
-
+    var playbackMode: PlaybackActionButton.Mode {
         switch playbackState {
         case .playing:
             return .pause
@@ -60,14 +56,6 @@ struct ActionToolbarState: Equatable {
 
     var showsRecordingToolbar: Bool {
         isInRecordingExclusiveMode
-    }
-
-    var showsRecordButton: Bool {
-        !isInRecordingExclusiveMode
-    }
-
-    var showsReviewButton: Bool {
-        reviewState != nil
     }
 
     var showsSendButton: Bool {

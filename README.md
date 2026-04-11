@@ -39,10 +39,7 @@ This is intentionally not a generic chat app. It is a focused quote-reading prac
 - macOS with Xcode 15+ (tested with iOS target 16.0)
 - Python 3.11+
 - LiveKit project credentials
-- Backend learner-review transcription credential:
-  - `OPENAI_API_KEY`, or
-  - `GEMINI_API_KEY`
-- At least one backend tutor TTS credential:
+- At least one AI provider credential for backend tutor TTS and learner-review STT:
   - `OPENAI_API_KEY`, or
   - `GEMINI_API_KEY`
 
@@ -54,8 +51,7 @@ This is intentionally not a generic chat app. It is a focused quote-reading prac
    - `LIVEKIT_URL`
    - `LIVEKIT_API_KEY`
    - `LIVEKIT_API_SECRET`
-   - `OPENAI_API_KEY` or `GEMINI_API_KEY` (required for learner-audio review transcription)
-   - `OPENAI_API_KEY` or `GEMINI_API_KEY` (required for tutor TTS)
+   - `OPENAI_API_KEY` or `GEMINI_API_KEY` (required for tutor TTS and learner-audio review STT)
 3. Optional tuning:
    - `TUTOR_TTS_PROVIDER`, `TUTOR_TTS_MODEL`, `TUTOR_TTS_VOICE`, `TUTOR_TTS_SPEED`
    - `REVIEW_STT_PROVIDER`, `REVIEW_STT_MODEL`

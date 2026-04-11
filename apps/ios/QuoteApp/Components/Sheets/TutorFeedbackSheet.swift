@@ -31,7 +31,7 @@ struct TutorFeedbackSheet: View {
     }
     
     private var showDetails: Bool {
-        analysis.state == .info && analysis.markedNormalizedTokens.isEmpty
+        analysis.state == .info && !analysis.markedNormalizedTokens.isEmpty
     }
 
     private var titleText: String {
@@ -56,9 +56,9 @@ struct TutorFeedbackSheet: View {
         case .info:
             return "A few words need another try."
         case .perfect:
-            return "You delivered this quote clearly and naturally."
+            return "This attempt stayed close to the quote text."
         case .unavailable:
-            return "We could not complete review for this attempt."
+            return "We could not complete the review for this attempt."
         case .loading:
             return "Reviewing your latest attempt."
         }
@@ -81,7 +81,7 @@ struct TutorFeedbackSheet_Previews: PreviewProvider {
             TutorFeedbackSheet(
                 analysis: PracticeAnalysis(
                     state: .perfect,
-                    feedbackText: "Excellent rhythm and pronunciation."
+                    feedbackText: "Nice work. This attempt stayed close to the quote text."
                 )
             )
             .previewDisplayName("Perfect")

@@ -10,7 +10,7 @@ struct StartView: View {
             Spacer()
                 .frame(height: 100)
 
-            Text("Let’s practice")
+            Text("Let’s speak")
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundStyle(.primary)
 
