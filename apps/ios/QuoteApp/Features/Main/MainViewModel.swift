@@ -37,6 +37,7 @@ final class MainViewModel: ObservableObject {
 
     private var sessionStartTask: Task<PracticeSessionStart, Error>?
     private var resultPollingTask: Task<Void, Never>?
+    private var tutorPlaybackTask: Task<Void, Never>?
     private var activeLoadingAttemptID: UUID?
     private let participantIdentity: String
     private var lastObservedPlaybackState: PlaybackState
@@ -241,6 +242,8 @@ final class MainViewModel: ObservableObject {
         sessionStartTask = nil
         resultPollingTask?.cancel()
         resultPollingTask = nil
+        tutorPlaybackTask?.cancel()
+        tutorPlaybackTask = nil
         activeLoadingAttemptID = nil
         isTutorAudioDownloadInFlight = false
         isTutorPlaybackCommandInFlight = false
@@ -372,9 +375,13 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        Task { [weak self] in
+        tutorPlaybackTask?.cancel()
+        tutorPlaybackTask = Task { [weak self] in
             guard let self else {
                 return
+            }
+            defer {
+                self.tutorPlaybackTask = nil
             }
 
             guard !self.isTutorPlaybackCommandInFlight else {
@@ -430,7 +437,7 @@ final class MainViewModel: ObservableObject {
 
                 do {
                     let sessionID = try await self.ensurePracticeSessionID(for: selectedQuote)
-                    guard self.sessionState.selectedQuote?.id == selectedQuote.id else {
+                    guard self.isSelectedQuoteCurrent(selectedQuote) else {
                         self.cancelTutorPlaybackRequestIfNeeded(restorePreviousState: true)
                         return
                     }
@@ -439,12 +446,20 @@ final class MainViewModel: ObservableObject {
                         for: selectedQuote,
                         sessionID: sessionID
                     )
+                    guard self.isSelectedQuoteCurrent(selectedQuote) else {
+                        self.cancelTutorPlaybackRequestIfNeeded(restorePreviousState: true)
+                        return
+                    }
 
                     let playbackIdentity = self.sessionState.practiceSession?.tutorPlaybackIdentity
                     if let playbackIdentity,
                        let cachedArtifact = self.tutorAudioCache.cachedAudioArtifact(
                            for: playbackIdentity
                        ) {
+                        guard self.isSelectedQuoteCurrent(selectedQuote) else {
+                            self.cancelTutorPlaybackRequestIfNeeded(restorePreviousState: true)
+                            return
+                        }
                         do {
                             try self.tutorPlaybackManager.beginPlaybackFromCachedAudioFile(
                                 fileURL: cachedArtifact.fileURL,
@@ -478,6 +493,10 @@ final class MainViewModel: ObservableObject {
                         )
                     }
                     self.isTutorAudioDownloadInFlight = false
+                    guard self.isSelectedQuoteCurrent(selectedQuote) else {
+                        self.cancelTutorPlaybackRequestIfNeeded(restorePreviousState: true)
+                        return
+                    }
                     let cachedFileURL = try self.tutorAudioCache.storeAudioArtifact(
                         data: artifact.audioData,
                         playbackIdentity: artifact.playbackIdentity,
@@ -493,6 +512,10 @@ final class MainViewModel: ObservableObject {
                         for: selectedQuote,
                         sessionID: self.currentBackendSessionID
                     )
+                    guard self.isSelectedQuoteCurrent(selectedQuote) else {
+                        self.cancelTutorPlaybackRequestIfNeeded(restorePreviousState: true)
+                        return
+                    }
                     try self.tutorPlaybackManager.beginPlaybackFromCachedAudioFile(
                         fileURL: cachedFileURL,
                         wordCount: artifact.wordCount > 0 ? artifact.wordCount : selectedQuote.wordCount,
@@ -505,7 +528,15 @@ final class MainViewModel: ObservableObject {
                     self.practiceStatusMessage = isRestartFromBeginning
                         ? "Tutor playback restarting from the beginning."
                         : "Tutor playback started."
+                } catch is CancellationError {
+                    if self.isSelectedQuoteCurrent(selectedQuote) {
+                        self.cancelTutorPlaybackRequestIfNeeded(restorePreviousState: true)
+                    }
+                    return
                 } catch {
+                    guard self.isSelectedQuoteCurrent(selectedQuote) else {
+                        return
+                    }
                     self.refreshLiveAPIStatusAfterRequestError(error)
                     let fallbackStarted = await self.startTutorPlaybackViaLiveKitFallback(
                         for: selectedQuote,
@@ -942,7 +973,7 @@ final class MainViewModel: ObservableObject {
         do {
             let sessionID = try await ensurePracticeSessionID(for: quote)
             await connectLiveKitIfNeeded(for: quote, sessionID: sessionID)
-            guard sessionState.selectedQuote?.id == quote.id else {
+            guard isSelectedQuoteCurrent(quote) else {
                 return false
             }
 
@@ -956,9 +987,15 @@ final class MainViewModel: ObservableObject {
                     throw error
                 }
                 let recoveredSessionID = try await restartBackendSessionAndReconnect(for: quote)
+                guard isSelectedQuoteCurrent(quote) else {
+                    return false
+                }
                 pendingTutorPlaybackRequestedAt = Date()
                 pendingTutorPlaybackSessionID = recoveredSessionID
                 try await practiceRepository.requestTutorPlayback(sessionID: recoveredSessionID)
+            }
+            guard isSelectedQuoteCurrent(quote) else {
+                return false
             }
             await refreshLiveAPIStatusAfterRequestSuccess(
                 for: quote,
@@ -969,6 +1006,8 @@ final class MainViewModel: ObservableObject {
                 ? "Tutor playback restarting from the beginning."
                 : "Tutor playback requested."
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             refreshLiveAPIStatusAfterRequestError(error)
             return false
@@ -1071,10 +1110,17 @@ final class MainViewModel: ObservableObject {
         playbackState.isFinishedAtEnd ? .repeatPlayback : .play
     }
 
+    private func isSelectedQuoteCurrent(_ quote: Quote) -> Bool {
+        sessionState.selectedQuote?.id == quote.id
+    }
+
     private func handleTutorPlaybackEvent(_ event: TutorPlaybackEvent) {
         switch event {
         case let .started(sessionID, wordCount, estimatedDurationSeconds):
             guard matchesCurrentSession(eventSessionID: sessionID) else {
+                return
+            }
+            guard tutorPlaybackState.isRequesting || pendingTutorPlaybackSessionID != nil else {
                 return
             }
             if let requestedAt = pendingTutorPlaybackRequestedAt,
