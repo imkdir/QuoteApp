@@ -38,6 +38,13 @@ class StartPracticeSessionRequest(BaseModel):
     quote_text: Optional[str] = Field(default=None, min_length=1, max_length=2000)
 
 
+class UpdatePracticeSessionQuoteRequest(BaseModel):
+    """Payload used to switch quote context inside an existing session."""
+
+    quote_id: str = Field(min_length=1, max_length=128)
+    quote_text: Optional[str] = Field(default=None, min_length=1, max_length=2000)
+
+
 class StartPracticeSessionResponse(BaseModel):
     """Session start response used by iOS practice flow."""
 

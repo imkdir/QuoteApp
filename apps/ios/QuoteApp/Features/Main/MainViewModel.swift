@@ -230,6 +230,7 @@ final class MainViewModel: ObservableObject {
 
     func selectQuote(_ quote: Quote) {
         let previousSessionID = sessionState.practiceSession?.backendSessionID
+        let previousLiveKitRoomName = sessionState.practiceSession?.liveKitRoomName
         let shouldStopPreviousTutorPlayback =
             tutorPlaybackState.isPlaying && tutorPlaybackManager.isUsingBackendStream
 
@@ -240,7 +241,13 @@ final class MainViewModel: ObservableObject {
         activeLoadingAttemptID = nil
         isTutorAudioDownloadInFlight = false
 
-        sessionState = .practice(PracticeSession(quote: quote))
+        sessionState = .practice(
+            PracticeSession(
+                quote: quote,
+                backendSessionID: previousSessionID,
+                liveKitRoomName: previousLiveKitRoomName
+            )
+        )
         isQuotePickerPresented = false
         tutorPlaybackManager.prepareForQuote(
             wordCount: quote.wordCount,
@@ -271,7 +278,16 @@ final class MainViewModel: ObservableObject {
             }
 
             do {
-                let sessionID = try await self.ensurePracticeSessionID(for: quote)
+                let sessionID: String
+                if let activeSessionID = previousSessionID {
+                    let updatedSession = try await self.switchQuoteInExistingSession(
+                        sessionID: activeSessionID,
+                        quote: quote
+                    )
+                    sessionID = updatedSession.sessionID
+                } else {
+                    sessionID = try await self.ensurePracticeSessionID(for: quote)
+                }
                 await self.connectLiveKitIfNeeded(for: quote, sessionID: sessionID)
             } catch is CancellationError {
                 return
@@ -805,6 +821,9 @@ final class MainViewModel: ObservableObject {
 
             updatePracticeSession { session in
                 session.backendSessionID = startedSession.sessionID
+                if let liveKitRoom = startedSession.liveKitRoom, !liveKitRoom.isEmpty {
+                    session.liveKitRoomName = liveKitRoom
+                }
                 if let tutorPlaybackIdentity = startedSession.tutorPlaybackIdentity,
                    !tutorPlaybackIdentity.isEmpty {
                     session.tutorPlaybackIdentity = tutorPlaybackIdentity
@@ -940,7 +959,10 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        let roomName = makeLiveKitRoomName(quoteID: quote.id, sessionID: sessionID)
+        let roomName = currentLiveKitRoomName(
+            for: quote,
+            sessionID: sessionID
+        )
 
         if case let .connected(activeRoom, _) = liveKitConnectionState,
            activeRoom == roomName {
@@ -967,6 +989,20 @@ final class MainViewModel: ObservableObject {
         let allowed = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
         let sanitized = String(raw.filter { allowed.contains($0) })
         return sanitized.isEmpty ? "practice-default" : sanitized
+    }
+
+    private func currentLiveKitRoomName(
+        for quote: Quote,
+        sessionID: String
+    ) -> String {
+        if let practiceSession = sessionState.practiceSession,
+           practiceSession.backendSessionID == sessionID,
+           let liveKitRoomName = practiceSession.liveKitRoomName,
+           !liveKitRoomName.isEmpty {
+            return liveKitRoomName
+        }
+
+        return makeLiveKitRoomName(quoteID: quote.id, sessionID: sessionID)
     }
 
     private var currentBackendSessionID: String? {
@@ -1245,6 +1281,7 @@ final class MainViewModel: ObservableObject {
     private func restartBackendSessionAndReconnect(for quote: Quote) async throws -> String {
         updatePracticeSession { session in
             session.backendSessionID = nil
+            session.liveKitRoomName = nil
             session.tutorPlaybackIdentity = nil
         }
         pendingTutorPlaybackRequestedAt = nil
@@ -1253,6 +1290,57 @@ final class MainViewModel: ObservableObject {
         let recoveredSessionID = try await ensurePracticeSessionID(for: quote)
         await connectLiveKitIfNeeded(for: quote, sessionID: recoveredSessionID)
         return recoveredSessionID
+    }
+
+    private func switchQuoteInExistingSession(
+        sessionID: String,
+        quote: Quote
+    ) async throws -> PracticeSessionStart {
+        guard let practiceRepository else {
+            throw PracticeFlowError.repositoryUnavailable
+        }
+
+        do {
+            let updatedSession = try await practiceRepository.updateSessionQuote(
+                sessionID: sessionID,
+                quoteID: quote.id,
+                quoteText: quote.text
+            )
+            guard sessionState.selectedQuote?.id == quote.id else {
+                return updatedSession
+            }
+
+            updatePracticeSession { session in
+                session.backendSessionID = updatedSession.sessionID
+                if let liveKitRoom = updatedSession.liveKitRoom, !liveKitRoom.isEmpty {
+                    session.liveKitRoomName = liveKitRoom
+                }
+                session.tutorPlaybackIdentity = updatedSession.tutorPlaybackIdentity
+            }
+            await refreshLiveAPIStatusAfterRequestSuccess(
+                for: quote,
+                sessionID: updatedSession.sessionID
+            )
+            return updatedSession
+        } catch {
+            guard isSessionExpiredError(error) else {
+                throw error
+            }
+            updatePracticeSession { session in
+                session.backendSessionID = nil
+                session.liveKitRoomName = nil
+                session.tutorPlaybackIdentity = nil
+            }
+            let recreatedSessionID = try await ensurePracticeSessionID(for: quote)
+            return PracticeSessionStart(
+                sessionID: recreatedSessionID,
+                quoteID: quote.id,
+                liveKitRoom: sessionState.practiceSession?.liveKitRoomName,
+                latestAttemptID: nil,
+                latestResultState: nil,
+                tutorPlaybackIdentity: sessionState.practiceSession?.tutorPlaybackIdentity
+            )
+        }
     }
 
     private func startLiveKitSetupIfStatusFailed(

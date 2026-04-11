@@ -157,6 +157,27 @@ def update_tutor_status(
         session.tutor_status_message = message
 
 
+def update_practice_session_quote(
+    *,
+    session_id: str,
+    quote_id: str,
+    quote_text: Optional[str],
+) -> PracticeSession:
+    """Switches quote context inside an existing practice session without replacing room/session IDs."""
+
+    with _SESSIONS_LOCK:
+        session = _SESSIONS.get(session_id)
+        if session is None:
+            raise SessionNotFoundError(f"Session not found: {session_id}")
+
+        session.quote_id = quote_id
+        session.quote_text = quote_text
+        session.attempts.clear()
+        session.tutor_status = "pending"
+        session.tutor_status_message = "Tutor context updated for the selected quote."
+        return session
+
+
 def _persist_submission_audio(
     *,
     session_id: str,

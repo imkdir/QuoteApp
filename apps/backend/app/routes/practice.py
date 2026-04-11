@@ -13,12 +13,14 @@ from app.models.practice_session import (
     StartPracticeSessionResponse,
     SubmitPracticeAttemptResponse,
     TutorPlaybackCommandResponse,
+    UpdatePracticeSessionQuoteRequest,
 )
 from app.config import get_settings
 from app.services.practice_service import (
     SessionNotFoundError,
     create_practice_session,
     get_practice_session,
+    update_practice_session_quote,
     update_tutor_status,
     submit_practice_attempt,
 )
@@ -132,6 +134,68 @@ def get_latest_attempt_result(
         review_state=response.state.value,
     )
     return response
+
+
+@router.post(
+    "/session/{session_id}/quote",
+    response_model=StartPracticeSessionResponse,
+)
+def update_session_quote(
+    session_id: str,
+    payload: UpdatePracticeSessionQuoteRequest,
+) -> StartPracticeSessionResponse:
+    """Updates quote context for an existing session without replacing the LiveKit room."""
+
+    settings = get_settings()
+    try:
+        _TUTOR_RUNTIME.stop_quote_playback(session_id=session_id)
+        session = update_practice_session_quote(
+            session_id=session_id,
+            quote_id=payload.quote_id,
+            quote_text=payload.quote_text,
+        )
+        _TUTOR_RUNTIME.update_session_quote_context(
+            session_id=session.session_id,
+            quote_id=session.quote_id,
+            quote_text=session.quote_text or "",
+        )
+        _sync_tutor_status(session_id)
+    except SessionNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "session_not_found",
+                "message": str(exc),
+            },
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "session_not_found",
+                "message": str(exc),
+            },
+        ) from exc
+
+    tutor_playback_identity: Optional[str] = None
+    try:
+        tutor_playback_identity = _TUTOR_RUNTIME.playback_identity_for_session(
+            session_id=session.session_id,
+            settings=settings,
+        )
+    except RuntimeError:
+        tutor_playback_identity = None
+
+    return StartPracticeSessionResponse(
+        session_id=session.session_id,
+        quote_id=session.quote_id,
+        livekit_room=session.livekit_room,
+        tutor_identity=session.tutor_identity,
+        tutor_status=session.tutor_status,
+        tutor_playback_identity=tutor_playback_identity,
+        latest_attempt_id=None,
+        latest_result_state=None,
+    )
 
 
 @router.post(

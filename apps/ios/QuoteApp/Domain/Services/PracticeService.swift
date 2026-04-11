@@ -3,6 +3,7 @@ import Foundation
 struct PracticeSessionStart {
     let sessionID: String
     let quoteID: String
+    let liveKitRoom: String?
     let latestAttemptID: String?
     let latestResultState: AnalysisState?
     let tutorPlaybackIdentity: String?
@@ -76,6 +77,7 @@ struct PracticeService {
     private struct StartSessionResponseDTO: Decodable {
         let sessionID: String
         let quoteID: String
+        let liveKitRoom: String?
         let latestAttemptID: String?
         let latestResultStateRaw: String?
         let tutorPlaybackIdentityRaw: String?
@@ -83,6 +85,7 @@ struct PracticeService {
         enum CodingKeys: String, CodingKey {
             case sessionID = "session_id"
             case quoteID = "quote_id"
+            case liveKitRoom = "livekit_room"
             case latestAttemptID = "latest_attempt_id"
             case latestResultStateRaw = "latest_result_state"
             case tutorPlaybackIdentityRaw = "tutor_playback_identity"
@@ -182,6 +185,47 @@ struct PracticeService {
             return PracticeSessionStart(
                 sessionID: dto.sessionID,
                 quoteID: dto.quoteID,
+                liveKitRoom: dto.liveKitRoom,
+                latestAttemptID: dto.latestAttemptID,
+                latestResultState: mappedState,
+                tutorPlaybackIdentity: dto.tutorPlaybackIdentityRaw
+            )
+        } catch {
+            throw PracticeServiceError.decodingFailed
+        }
+    }
+
+    func updateSessionQuote(
+        sessionID: String,
+        quoteID: String,
+        quoteText: String?
+    ) async throws -> PracticeSessionStart {
+        let endpoint = baseURL
+            .appendingPathComponent("practice")
+            .appendingPathComponent("session")
+            .appendingPathComponent(sessionID)
+            .appendingPathComponent("quote")
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(
+            StartSessionRequestDTO(
+                quoteID: quoteID,
+                quoteText: quoteText
+            )
+        )
+
+        let data = try await perform(request: request)
+
+        do {
+            let dto = try JSONDecoder().decode(StartSessionResponseDTO.self, from: data)
+            let mappedState = dto.latestResultStateRaw.flatMap(AnalysisState.init(rawValue:))
+
+            return PracticeSessionStart(
+                sessionID: dto.sessionID,
+                quoteID: dto.quoteID,
+                liveKitRoom: dto.liveKitRoom,
                 latestAttemptID: dto.latestAttemptID,
                 latestResultState: mappedState,
                 tutorPlaybackIdentity: dto.tutorPlaybackIdentityRaw

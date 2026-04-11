@@ -372,6 +372,28 @@ class SpeakingTutorAgentRuntime:
                 return
             stop_event.set()
 
+    def update_session_quote_context(
+        self,
+        *,
+        session_id: str,
+        quote_id: str,
+        quote_text: str,
+    ) -> TutorSessionContext:
+        """Updates quote context for an existing tutor session without changing room identity."""
+
+        with self._lock:
+            context = self._contexts.get(session_id)
+            if context is None:
+                raise RuntimeError(f"tutor session context is missing: {session_id}")
+
+            context.quote_id = quote_id
+            context.quote_text = quote_text
+            context.latest_attempt_id = None
+            context.latest_review_state = None
+            context.status = "ready"
+            context.status_message = "Tutor context updated for selected quote."
+            return TutorSessionContext(**context.__dict__)
+
     def note_latest_attempt(
         self,
         *,
