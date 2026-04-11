@@ -31,7 +31,7 @@ struct PlaybackActionButton: View {
             case .pause:
                 return "Pauses tutor playback"
             case .play:
-                return "Starts tutor playback"
+                return "Starts or resumes tutor playback"
             case .repeatPlayback:
                 return "Restarts tutor playback from the beginning"
             }

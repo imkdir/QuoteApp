@@ -29,7 +29,7 @@ struct ActionToolbarState: Equatable {
         case .idle:
             return .play
         case .paused:
-            return .repeatPlayback
+            return .play
         case .finishedAtEnd:
             return .repeatPlayback
         }

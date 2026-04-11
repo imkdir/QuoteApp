@@ -37,6 +37,7 @@ final class TutorPlaybackManager: NSObject, ObservableObject {
 
     private let timingCoordinator: PlaybackTimingCoordinator
     private var audioPlayer: AVAudioPlayer?
+    private var pausedLocalPlaybackTime: TimeInterval?
 
     var isUsingLocalAudio: Bool {
         activePlaybackSource == .localCachedArtifact
@@ -121,6 +122,7 @@ final class TutorPlaybackManager: NSObject, ObservableObject {
         }
 
         audioPlayer = player
+        pausedLocalPlaybackTime = nil
         activePlaybackSource = .localCachedArtifact
 
         let clampedWordCount = max(0, wordCount)
@@ -139,8 +141,10 @@ final class TutorPlaybackManager: NSObject, ObservableObject {
     }
 
     func pauseFromBackendStop() {
-        if activePlaybackSource == .localCachedArtifact {
-            audioPlayer?.pause()
+        if activePlaybackSource == .localCachedArtifact,
+           let audioPlayer {
+            audioPlayer.pause()
+            pausedLocalPlaybackTime = audioPlayer.currentTime
         }
 
         timingCoordinator.pause()
@@ -150,6 +154,30 @@ final class TutorPlaybackManager: NSObject, ObservableObject {
         case .finishedAtEnd, .idle:
             return
         }
+    }
+
+    func resumeFromPausedPlaybackIfPossible() -> Bool {
+        guard playbackState.isPaused else {
+            return false
+        }
+        guard activePlaybackSource == .localCachedArtifact,
+              let audioPlayer else {
+            return false
+        }
+
+        if let pausedLocalPlaybackTime {
+            let clampedTime = min(max(0, pausedLocalPlaybackTime), audioPlayer.duration)
+            audioPlayer.currentTime = clampedTime
+        }
+
+        guard audioPlayer.play() else {
+            return false
+        }
+
+        timingCoordinator.resume()
+        playbackState = .playing(progress: timingCoordinator.progress)
+        pausedLocalPlaybackTime = nil
+        return true
     }
 
     func markFinishedAtEndFromBackend() {
@@ -190,6 +218,7 @@ final class TutorPlaybackManager: NSObject, ObservableObject {
     private func stopLocalAudioPlayback() {
         audioPlayer?.stop()
         audioPlayer = nil
+        pausedLocalPlaybackTime = nil
     }
 
     private func normalizedExpectedDuration(

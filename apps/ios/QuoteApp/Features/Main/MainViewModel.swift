@@ -362,7 +362,15 @@ final class MainViewModel: ObservableObject {
                 self.practiceStatusMessage = "Tutor playback paused."
                 self.isTutorPlaybackCommandInFlight = false
 
-            case .idle, .paused, .finishedAtEnd:
+            case .paused:
+                if self.tutorPlaybackManager.resumeFromPausedPlaybackIfPossible() {
+                    self.tutorPlaybackState = self.tutorPlaybackManager.playbackState
+                    self.practiceStatusMessage = "Tutor playback resumed."
+                    return
+                }
+                fallthrough
+
+            case .idle, .finishedAtEnd:
                 guard let practiceRepository else {
                     self.practiceStatusMessage = "Tutor playback is unavailable because backend practice services are not configured."
                     return
@@ -423,8 +431,7 @@ final class MainViewModel: ObservableObject {
                         rhythmWordEndTimes: artifact.rhythmWordEndTimes
                     )
 
-                    let isRestartFromBeginning =
-                        playbackStateBeforeCommand.isPaused || playbackStateBeforeCommand.isFinishedAtEnd
+                    let isRestartFromBeginning = playbackStateBeforeCommand.isFinishedAtEnd
                     self.practiceStatusMessage = isRestartFromBeginning
                         ? "Tutor playback restarting from the beginning."
                         : "Tutor playback started."
@@ -835,8 +842,7 @@ final class MainViewModel: ObservableObject {
             pendingTutorPlaybackRequestedAt = Date()
             pendingTutorPlaybackSessionID = sessionID
             try await practiceRepository.requestTutorPlayback(sessionID: sessionID)
-            let isRestartFromBeginning =
-                playbackStateBeforeCommand.isPaused || playbackStateBeforeCommand.isFinishedAtEnd
+            let isRestartFromBeginning = playbackStateBeforeCommand.isFinishedAtEnd
             practiceStatusMessage = isRestartFromBeginning
                 ? "Tutor playback restarting from the beginning."
                 : "Tutor playback requested."

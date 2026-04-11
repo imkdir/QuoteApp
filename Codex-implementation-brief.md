@@ -108,6 +108,12 @@ A tutor review result may be simplified to:
   * `perfect`
   * `unavailable`
 
+Hard rule:
+
+* the review result must be grounded in actual learner audio analysis against the selected quote
+* do not derive `info`, `perfect`, or marked words primarily from attempt id, audio byte length, deterministic hashing, arbitrary quote-token selection, or other mock selectors
+* modest real analysis is preferred over elaborate fake precision
+
 The UI should display the latest attempt’s review state.
 
 When the learner sends a new recording:
@@ -565,6 +571,13 @@ Implement result mapping into app-facing states:
 
 * a brief explanation that review could not be completed
 
+Additional hard rules:
+
+* review output must be grounded in actual learner audio analysis against the selected quote
+* do not use attempt id, audio byte size, hashing, arbitrary token picking, or other mock selectors as the primary review path
+* a modest transcript-based or STT/alignment-based comparison is acceptable for MVP
+* avoid pretending to have phoneme-level precision unless the implementation truly supports it
+
 ### Backend task 8 — Result polling endpoint
 
 Implement `GET /practice/session/{id}/result`.
@@ -593,6 +606,7 @@ Additionally, the backend is the natural place for:
 
 * quote retrieval
 * session context
+* real learner-audio analysis against the selected quote
 * analysis result shaping
 * future progress logic
 
@@ -905,7 +919,9 @@ Polish transitions and cleanup README/setup.
 * Keep the app small and coherent.
 * Do not add auth, settings, session history, or generic chat.
 * Do not over-engineer pronunciation scoring.
-* The most important thing is a believable end-to-end speaking-practice loop.
+* The most important thing is a real end-to-end speaking-practice loop, not a clever mock.
 * Prefer clear state transitions over feature breadth.
 * Do not treat transcript/data-channel text as a substitute for tutor speech.
 * Do not use macOS `say` or local iOS TTS as the primary tutor voice path.
+* Do not use attempt id, audio byte size, hashing, or arbitrary token picking as the primary review-analysis path.
+* If real analysis is still modest, make it honestly modest and grounded in actual learner audio.
