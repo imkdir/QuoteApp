@@ -13,21 +13,9 @@ struct MainScreen: View {
             ZStack {
                 Color(uiColor: .systemBackground)
                     .ignoresSafeArea()
-
                 content
             }
             .navigationBarTitleDisplayMode(.inline)
-        }
-        .sheet(isPresented: $viewModel.isQuotePickerPresented) {
-            QuotePickerSheet(
-                quotes: viewModel.quotes,
-                isLoading: viewModel.isLoadingQuotes && viewModel.quotes.isEmpty,
-                errorMessage: viewModel.quoteLoadingErrorMessage,
-                onSelect: viewModel.selectQuote,
-                onRetry: viewModel.retryQuoteLoading,
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
         }
         .sheet(item: $viewModel.feedbackSheetAnalysis) { analysis in
             TutorFeedbackSheet(analysis: analysis)
@@ -51,9 +39,19 @@ struct MainScreen: View {
         }
     }
 
-    private func practiceView(quote: Quote) -> some View {
+    private func practiceView(quote: Quote?) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            QuoteTextView(tokens: viewModel.currentQuoteTokens)
+            if let quote {
+                QuoteTextView(tokens: viewModel.tokens(from: quote))
+            } else {
+                QuoteListView(
+                    quotes: viewModel.quotes,
+                    isLoading: viewModel.isLoadingQuotes && viewModel.quotes.isEmpty,
+                    errorMessage: viewModel.quoteLoadingErrorMessage,
+                    onSelect: viewModel.selectQuote,
+                    onRetry: viewModel.retryQuoteLoading,
+                )
+            }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

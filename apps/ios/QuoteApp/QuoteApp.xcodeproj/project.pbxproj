@@ -32,7 +32,7 @@
 		8994A7EB2BC30B8505EB6060 /* QuoteRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4DCCC77A4D3A0AC74650A7 /* QuoteRepository.swift */; };
 		8B981B1502F3CD1E5505521B /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA015C3E3B3DABA8D33BBD0 /* AppEnvironment.swift */; };
 		8D17DEA990A3611DCDFB9267 /* QuoteToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF467E05B9B5899B1394069D /* QuoteToken.swift */; };
-		91FD0103B569BED13FE2974C /* QuotePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF73190212EA0175F00507F /* QuotePickerSheet.swift */; };
+		91FD0103B569BED13FE2974C /* QuoteListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF73190212EA0175F00507F /* QuoteListView.swift */; };
 		9C0751BDE2816183E7510B28 /* TutorPlaybackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBF2508AF11587E8F6286B36 /* TutorPlaybackManager.swift */; };
 		9D4499BAF4F8B632F34D61BE /* MarkedToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6247001E96324250B32B9B88 /* MarkedToken.swift */; };
 		A1EAC7D29A192DD677707B7C /* AnalysisState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DF79F858FA03A8C253F036C /* AnalysisState.swift */; };
@@ -52,7 +52,7 @@
 /* Begin PBXFileReference section */
 		08BFAFFE3C583FD52AB1819D /* MockQuotes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockQuotes.swift; sourceTree = "<group>"; };
 		0B98C1D1929240C149DB7ABA /* MainSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainSessionState.swift; sourceTree = "<group>"; };
-		0DF73190212EA0175F00507F /* QuotePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotePickerSheet.swift; sourceTree = "<group>"; };
+		0DF73190212EA0175F00507F /* QuoteListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteListView.swift; sourceTree = "<group>"; };
 		10ACCDE16097BC99AB08DB09 /* ActionToolbarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionToolbarState.swift; sourceTree = "<group>"; };
 		1A69D0C357C06628A9814142 /* PlaybackActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackActionButton.swift; sourceTree = "<group>"; };
 		2E7073FAE8925BF92334FECE /* QuoteTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteTextView.swift; sourceTree = "<group>"; };
@@ -79,8 +79,8 @@
 		A6777E4D7C91EE4B9B8A6946 /* MainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewModel.swift; sourceTree = "<group>"; };
 		AB68EB47D1CF9AA11E70040A /* RecordingInputToolbarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingInputToolbarState.swift; sourceTree = "<group>"; };
 		B31840349442F6F35D003E32 /* RecordingWaveformField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingWaveformField.swift; sourceTree = "<group>"; };
-		BC72F834D4FE43BDBDB5980D /* TutorAudioCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorAudioCache.swift; sourceTree = "<group>"; };
 		BBF2508AF11587E8F6286B36 /* TutorPlaybackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorPlaybackManager.swift; sourceTree = "<group>"; };
+		BC72F834D4FE43BDBDB5980D /* TutorAudioCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorAudioCache.swift; sourceTree = "<group>"; };
 		BCA015C3E3B3DABA8D33BBD0 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		CBDDD2296983E1EF93CB4A54 /* QuoteApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QuoteApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF467E05B9B5899B1394069D /* QuoteToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteToken.swift; sourceTree = "<group>"; };
@@ -194,7 +194,7 @@
 			isa = PBXGroup;
 			children = (
 				DC094CC1B49F4B162C7E0227 /* QuoteListItemView.swift */,
-				0DF73190212EA0175F00507F /* QuotePickerSheet.swift */,
+				0DF73190212EA0175F00507F /* QuoteListView.swift */,
 				2E7073FAE8925BF92334FECE /* QuoteTextView.swift */,
 				39EAA8D86FE959FD98006578 /* StartView.swift */,
 			);
@@ -374,7 +374,7 @@
 				166FE4D954F64FB2E95829A7 /* Quote.swift in Sources */,
 				5EADAA4A3C892E1A496B07F8 /* QuoteApp.swift in Sources */,
 				769A7DB2489766B427B485FE /* QuoteListItemView.swift in Sources */,
-				91FD0103B569BED13FE2974C /* QuotePickerSheet.swift in Sources */,
+				91FD0103B569BED13FE2974C /* QuoteListView.swift in Sources */,
 				8994A7EB2BC30B8505EB6060 /* QuoteRepository.swift in Sources */,
 				2101B394EF59FCBE7EE1376C /* QuoteService.swift in Sources */,
 				0A42290222662532AA73EA08 /* QuoteTextView.swift in Sources */,

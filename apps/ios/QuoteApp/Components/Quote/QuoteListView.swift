@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct QuotePickerSheet: View {
+struct QuoteListView: View {
     let quotes: [Quote]
     let isLoading: Bool
     let errorMessage: String?
@@ -8,16 +8,6 @@ struct QuotePickerSheet: View {
     let onRetry: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Quotes")
-                .font(.headline)
-            content
-        }
-        .padding(20)
-    }
-
-    @ViewBuilder
-    private var content: some View {
         if isLoading {
             VStack(spacing: 12) {
                 ProgressView()
@@ -56,7 +46,7 @@ struct QuotePickerSheet: View {
 struct QuotePickerSheet_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            QuotePickerSheet(
+            QuoteListView(
                 quotes: [],
                 isLoading: true,
                 errorMessage: nil,
@@ -65,7 +55,7 @@ struct QuotePickerSheet_Previews: PreviewProvider {
             )
             .previewDisplayName("Quote Picker Loading")
 
-            QuotePickerSheet(
+            QuoteListView(
                 quotes: MockQuotes.all,
                 isLoading: false,
                 errorMessage: nil,
@@ -74,7 +64,7 @@ struct QuotePickerSheet_Previews: PreviewProvider {
             )
             .previewDisplayName("Quote Picker Success")
 
-            QuotePickerSheet(
+            QuoteListView(
                 quotes: [],
                 isLoading: false,
                 errorMessage: "Could not load quotes. Check backend and retry.",

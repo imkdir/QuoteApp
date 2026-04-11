@@ -33,7 +33,7 @@ struct LocalRecordingDraft: Equatable {
 }
 
 struct PracticeSession: Equatable {
-    let quote: Quote
+    let quote: Quote?
     var backendSessionID: String?
     var liveKitRoomName: String?
     var tutorPlaybackIdentity: String?
@@ -41,7 +41,7 @@ struct PracticeSession: Equatable {
     var localRecordingDraft: LocalRecordingDraft?
 
     init(
-        quote: Quote,
+        quote: Quote?,
         backendSessionID: String? = nil,
         liveKitRoomName: String? = nil,
         tutorPlaybackIdentity: String? = nil,
@@ -73,7 +73,7 @@ struct PracticeSession: Equatable {
     }
 
     var quoteWordCount: Int {
-        quote.wordCount
+        quote?.wordCount ?? 0
     }
 }
 

@@ -16,7 +16,6 @@ final class MainViewModel: ObservableObject {
     }
 
     @Published var sessionState: MainSessionState
-    @Published var isQuotePickerPresented: Bool
     @Published var practiceStatusMessage: String
     @Published var feedbackSheetAnalysis: PracticeAnalysis?
     @Published var tutorPlaybackState: PlaybackState
@@ -57,7 +56,6 @@ final class MainViewModel: ObservableObject {
         tutorPlaybackManager: TutorPlaybackManager? = nil,
         tutorAudioCache: TutorAudioCache = TutorAudioCache(),
         sessionState: MainSessionState = .start,
-        isQuotePickerPresented: Bool = false,
         feedbackSheetAnalysis: PracticeAnalysis? = nil,
         isLoadingQuotes: Bool = false,
         quoteLoadingErrorMessage: String? = nil,
@@ -73,7 +71,6 @@ final class MainViewModel: ObservableObject {
         self.tutorPlaybackManager = tutorPlaybackManager ?? TutorPlaybackManager()
         self.tutorAudioCache = tutorAudioCache
         self.sessionState = sessionState
-        self.isQuotePickerPresented = isQuotePickerPresented
         self.practiceStatusMessage = "All words are dimmed. Tap Play to hear the tutor."
         self.feedbackSheetAnalysis = feedbackSheetAnalysis
         self.tutorPlaybackState = self.tutorPlaybackManager.playbackState
@@ -163,9 +160,13 @@ final class MainViewModel: ObservableObject {
         guard let selectedQuote = sessionState.selectedQuote else {
             return []
         }
+        return tokens(from: selectedQuote)
+    }
+    
+    func tokens(from quote: Quote) -> [QuoteToken] {
 
         let spokenWordCount = tutorPlaybackState.spokenWordCount
-        let baseTokens = selectedQuote.makeTokens(spokenCount: spokenWordCount, markedTokenIndexes: [])
+        let baseTokens = quote.makeTokens(spokenCount: spokenWordCount, markedTokenIndexes: [])
         let markedWordSet = Set(markedWordsFromLatestAnalysis)
 
         let markedIndexes = Set(
@@ -174,7 +175,7 @@ final class MainViewModel: ObservableObject {
                 .map(\.index)
         )
 
-        return selectedQuote.makeTokens(spokenCount: spokenWordCount, markedTokenIndexes: markedIndexes)
+        return quote.makeTokens(spokenCount: spokenWordCount, markedTokenIndexes: markedIndexes)
     }
 
     var liveKitStatusBannerText: String? {
@@ -195,14 +196,14 @@ final class MainViewModel: ObservableObject {
     var liveKitStatusSymbol: String {
         switch liveKitConnectionState {
         case .disconnected:
-            return "waveform.slash"
+            return "waveform.low"
         case .requestingToken,
              .connecting:
-            return "waveform.low"
-        case .connected:
             return "waveform.mid"
+        case .connected:
+            return "waveform"
         case .failed:
-            return "waveform.badge.exclamationmark"
+            return "waveform.slash"
         }
     }
 
@@ -216,19 +217,15 @@ final class MainViewModel: ObservableObject {
     private static let defaultWaveformLevels = Array(repeating: CGFloat(0.12), count: 16)
 
     func openQuotePicker() {
-        isQuotePickerPresented = true
+        selectQuote(nil)
         loadQuotesIfNeeded()
-    }
-
-    func closeQuotePicker() {
-        isQuotePickerPresented = false
     }
 
     func retryQuoteLoading() {
         loadQuotes(force: true)
     }
 
-    func selectQuote(_ quote: Quote) {
+    func selectQuote(_ quote: Quote?) {
         let previousSessionID = sessionState.practiceSession?.backendSessionID
         let previousLiveKitRoomName = sessionState.practiceSession?.liveKitRoomName
         let shouldStopPreviousTutorPlayback =
@@ -248,11 +245,12 @@ final class MainViewModel: ObservableObject {
                 liveKitRoomName: previousLiveKitRoomName
             )
         )
-        isQuotePickerPresented = false
-        tutorPlaybackManager.prepareForQuote(
-            wordCount: quote.wordCount,
-            quoteText: quote.text
-        )
+        if let quote {
+            tutorPlaybackManager.prepareForQuote(
+                wordCount: quote.wordCount,
+                quoteText: quote.text
+            )
+        }
         tutorPlaybackState = tutorPlaybackManager.playbackState
         feedbackSheetAnalysis = nil
         userRecordingManager?.clearRecording()
@@ -272,31 +270,33 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        Task { [weak self] in
-            guard let self else {
-                return
-            }
-
-            do {
-                let sessionID: String
-                if let activeSessionID = previousSessionID {
-                    let updatedSession = try await self.switchQuoteInExistingSession(
-                        sessionID: activeSessionID,
-                        quote: quote
-                    )
-                    sessionID = updatedSession.sessionID
-                } else {
-                    sessionID = try await self.ensurePracticeSessionID(for: quote)
-                }
-                await self.connectLiveKitIfNeeded(for: quote, sessionID: sessionID)
-            } catch is CancellationError {
-                return
-            } catch {
-                guard self.sessionState.selectedQuote?.id == quote.id else {
+        if let quote {
+            Task { [weak self] in
+                guard let self else {
                     return
                 }
-                self.refreshLiveAPIStatusAfterRequestError(error)
-                self.practiceStatusMessage = "Could not start practice session. Review may be unavailable."
+                
+                do {
+                    let sessionID: String
+                    if let activeSessionID = previousSessionID {
+                        let updatedSession = try await self.switchQuoteInExistingSession(
+                            sessionID: activeSessionID,
+                            quote: quote
+                        )
+                        sessionID = updatedSession.sessionID
+                    } else {
+                        sessionID = try await self.ensurePracticeSessionID(for: quote)
+                    }
+                    await self.connectLiveKitIfNeeded(for: quote, sessionID: sessionID)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard self.sessionState.selectedQuote?.id == quote.id else {
+                        return
+                    }
+                    self.refreshLiveAPIStatusAfterRequestError(error)
+                    self.practiceStatusMessage = "Could not start practice session. Review may be unavailable."
+                }
             }
         }
     }
