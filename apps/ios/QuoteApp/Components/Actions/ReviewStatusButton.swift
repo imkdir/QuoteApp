@@ -65,8 +65,6 @@ struct ReviewStatusButton: View {
 
     private var iconForegroundColor: Color {
         switch state {
-        case .unavailable:
-            return .orange
         case .reviewedPerfect:
             return .green
         case .reviewedNone:

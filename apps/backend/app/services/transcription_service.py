@@ -14,6 +14,7 @@ from app.config import Settings
 _SUPPORTED_REVIEW_STT_PROVIDERS = frozenset({"auto", "openai", "gemini", "none", "disabled"})
 _DEFAULT_REVIEW_STT_OPENAI_MODEL = "gpt-4o-mini-transcribe"
 _DEFAULT_REVIEW_STT_GEMINI_MODEL = "gemini-2.5-flash"
+_NO_SPEECH_SENTINEL = "<NO_USABLE_SPEECH>"
 
 
 class TranscriptionError(RuntimeError):
@@ -150,6 +151,8 @@ def _transcribe_with_openai(
 
     if not transcript_text:
         raise TranscriptionError("learner transcription returned empty text")
+    if _contains_no_speech_sentinel(transcript_text):
+        raise TranscriptionError("no usable speech detected")
 
     return transcript_text
 
@@ -225,32 +228,26 @@ def _transcribe_with_gemini(
     transcript_text = _extract_text_from_gemini_response(response_json).strip()
     if not transcript_text:
         raise TranscriptionError("gemini transcription returned empty text")
+    if _contains_no_speech_sentinel(transcript_text):
+        raise TranscriptionError("no usable speech detected")
     return transcript_text
 
 
 def _build_transcription_prompt(*, quote_text: Optional[str]) -> str:
-    if not quote_text:
-        return "Transcribe the learner speech exactly as spoken."
-
-    compact_quote = " ".join(quote_text.split())
-    hint = compact_quote[:500]
     return (
         "Transcribe the learner speech exactly as spoken. "
-        f"The target quote for context is: {hint}"
+        f"If there is no usable speech, return exactly {_NO_SPEECH_SENTINEL}. "
+        "Do not infer words from context."
     )
 
 
 def _build_gemini_transcription_prompt(*, quote_text: Optional[str]) -> str:
-    base_instruction = (
+    return (
         "Transcribe the learner speech exactly as spoken. "
-        "Return only plain transcript text with no commentary."
+        "Return only plain transcript text with no commentary. "
+        f"If there is no usable speech, return exactly {_NO_SPEECH_SENTINEL}. "
+        "Do not infer words from context."
     )
-    if not quote_text:
-        return base_instruction
-
-    compact_quote = " ".join(quote_text.split())
-    hint = compact_quote[:500]
-    return f"{base_instruction} Target quote for context: {hint}"
 
 
 def _extract_text_from_gemini_response(response_json: dict) -> str:
@@ -279,6 +276,11 @@ def _extract_text_from_gemini_response(response_json: dict) -> str:
             break
 
     return " ".join(text_parts).strip()
+
+
+def _contains_no_speech_sentinel(transcript_text: str) -> bool:
+    normalized = transcript_text.strip().upper()
+    return normalized == _NO_SPEECH_SENTINEL
 
 
 def _guess_audio_mime_type(filename: str) -> str:

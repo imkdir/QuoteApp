@@ -36,6 +36,7 @@ _REVIEW_EXECUTOR: Final[ThreadPoolExecutor] = ThreadPoolExecutor(
     max_workers=4, thread_name_prefix="quoteapp-review-worker"
 )
 _REVIEW_DELAY_SECONDS: Final[float] = 1.0
+_MIN_REVIEW_AUDIO_BYTES: Final[int] = 6_000
 
 
 def create_practice_session(
@@ -103,9 +104,6 @@ def submit_practice_attempt(
     original_filename: Optional[str] = None,
 ) -> PracticeAttempt:
     """Persists learner audio bytes and appends a new loading attempt."""
-
-    if not audio_bytes:
-        raise ValueError("audio payload is empty")
 
     with _SESSIONS_LOCK:
         session = _SESSIONS.get(session_id)
@@ -229,18 +227,22 @@ def _resolve_review_for_attempt(
         else:
             recording_path = Path(recording_reference)
             audio_bytes = recording_path.read_bytes()
-            transcript_text = transcribe_learner_audio(
-                audio_bytes=audio_bytes,
-                filename=recording_path.name,
-                quote_text=quote_text,
-                settings=get_settings(),
-            )
-            review_result = map_transcript_to_review(
-                TranscriptAnalysisInput(
-                    quote_text=quote_text,
-                    transcript_text=transcript_text,
+            if _recording_too_short_for_review(audio_bytes):
+                review_result = unavailable_result(reason="recording too short for review")
+            else:
+                transcript_text = transcribe_learner_audio(
+                    audio_bytes=audio_bytes,
+                    filename=recording_path.name,
+                    quote_text=None,
+                    settings=get_settings(),
                 )
-            )
+                review_result = map_transcript_to_review(
+                    TranscriptAnalysisInput(
+                        quote_text=quote_text,
+                        transcript_text=transcript_text,
+                        recording_num_bytes=len(audio_bytes),
+                    )
+                )
     except FileNotFoundError:
         review_result = unavailable_result(reason="submitted recording could not be loaded")
     except TranscriptionError as exc:
@@ -262,3 +264,9 @@ def _resolve_review_for_attempt(
             return
 
         attempt.review_result = review_result
+
+
+def _recording_too_short_for_review(audio_bytes: bytes) -> bool:
+    """Returns true when audio payload is too small for grounded STT comparison."""
+
+    return len(audio_bytes) < _MIN_REVIEW_AUDIO_BYTES
