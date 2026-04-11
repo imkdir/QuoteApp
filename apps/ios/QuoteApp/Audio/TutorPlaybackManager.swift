@@ -94,8 +94,7 @@ final class TutorPlaybackManager: NSObject, ObservableObject {
         )
         timingCoordinator.startFromBeginning(
             totalWordCount: clampedWordCount,
-            expectedDurationSeconds: estimatedDurationSeconds,
-            completionBehavior: .waitForExplicitFinish
+            expectedDurationSeconds: estimatedDurationSeconds
         )
     }
 
@@ -134,23 +133,8 @@ final class TutorPlaybackManager: NSObject, ObservableObject {
                 preferredDuration: estimatedDurationSeconds,
                 fallbackPlayerDuration: player.duration
             ),
-            completionBehavior: .waitForExplicitFinish,
             startDelaySeconds: 0,
             wordEndTimes: rhythmWordEndTimes
-        )
-    }
-
-    func beginLocalDevelopmentFallbackPlayback(wordCount: Int) {
-        stopLocalAudioPlayback()
-        activePlaybackSource = .none
-        let clampedWordCount = max(0, wordCount)
-        playbackState = .playing(
-            progress: PlaybackProgress(spokenWordCount: 0, totalWordCount: clampedWordCount)
-        )
-        timingCoordinator.startFromBeginning(
-            totalWordCount: clampedWordCount,
-            expectedDurationSeconds: nil,
-            completionBehavior: .autoFinishWhenProgressReachesEnd
         )
     }
 

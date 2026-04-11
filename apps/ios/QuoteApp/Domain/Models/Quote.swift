@@ -6,7 +6,6 @@ struct Quote: Identifiable, Hashable, Decodable {
     let fullText: String
     let bookTitle: String
     let author: String
-    let mockMarkedNormalizedTokens: [String]
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -23,15 +22,13 @@ struct Quote: Identifiable, Hashable, Decodable {
         previewText: String,
         fullText: String,
         bookTitle: String,
-        author: String,
-        mockMarkedNormalizedTokens: [String] = []
+        author: String
     ) {
         self.id = id
         self.previewText = previewText
         self.fullText = fullText
         self.bookTitle = bookTitle
         self.author = author
-        self.mockMarkedNormalizedTokens = mockMarkedNormalizedTokens
     }
 
     init(from decoder: Decoder) throws {
@@ -50,7 +47,6 @@ struct Quote: Identifiable, Hashable, Decodable {
         self.fullText = fullText
         self.bookTitle = try container.decodeIfPresent(String.self, forKey: .bookTitle) ?? ""
         self.author = try container.decodeIfPresent(String.self, forKey: .author) ?? ""
-        self.mockMarkedNormalizedTokens = []
     }
 
     var wordCount: Int {

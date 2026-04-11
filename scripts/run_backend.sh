@@ -4,20 +4,21 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="$ROOT_DIR/apps/backend"
 
-cd "$BACKEND_DIR"
+usage() {
+  cat <<'EOF'
+Usage:
+  ./scripts/run_backend.sh [--simulator|--device] [--host <host>] [--port <port>] [--no-reload]
 
-if [ ! -d ".venv" ]; then
-  echo "Missing virtual environment. Run ./scripts/setup_backend.sh first."
-  exit 1
-fi
+Modes:
+  --simulator (default)  Bind to localhost for iOS Simulator use
+  --device               Bind to 0.0.0.0 and print LAN URL for real-device testing
 
-source .venv/bin/activate
-
-if [ -f ".env" ]; then
-  set -a
-  source .env
-  set +a
-fi
+Environment overrides:
+  BACKEND_MODE=simulator|device
+  BACKEND_HOST=<host>
+  BACKEND_PORT=<port>
+EOF
+}
 
 detect_lan_ip() {
   local default_iface=""
@@ -48,17 +49,48 @@ detect_lan_ip() {
 }
 
 MODE="${BACKEND_MODE:-simulator}"
-if [ "${1:-}" = "--device" ] || [ "${1:-}" = "device" ]; then
-  MODE="device"
-elif [ "${1:-}" = "--simulator" ] || [ "${1:-}" = "simulator" ] || [ "${1:-}" = "local" ]; then
-  MODE="simulator"
-fi
+RELOAD=1
+HOST_OVERRIDE=""
+PORT_OVERRIDE=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --device|device|lan)
+      MODE="device"
+      ;;
+    --simulator|simulator|local)
+      MODE="simulator"
+      ;;
+    --host)
+      HOST_OVERRIDE="${2:-}"
+      shift
+      ;;
+    --port)
+      PORT_OVERRIDE="${2:-}"
+      shift
+      ;;
+    --no-reload)
+      RELOAD=0
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1"
+      echo ""
+      usage
+      exit 1
+      ;;
+  esac
+  shift
+done
 
 case "$MODE" in
-  simulator|local)
+  simulator)
     DEFAULT_HOST="127.0.0.1"
     ;;
-  device|lan)
+  device)
     DEFAULT_HOST="0.0.0.0"
     ;;
   *)
@@ -67,32 +99,72 @@ case "$MODE" in
     ;;
 esac
 
+cd "$BACKEND_DIR"
+
+if [ ! -d ".venv" ]; then
+  echo "Missing virtual environment. Run ./scripts/setup_backend.sh first."
+  exit 1
+fi
+
+# shellcheck disable=SC1091
+source .venv/bin/activate
+
+if ! python -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)'; then
+  echo "Backend virtual environment is using Python < 3.11."
+  echo "Continuing in compatibility mode; Python 3.11+ is recommended."
+fi
+
+if [ -f ".env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
 HOST="${BACKEND_HOST:-$DEFAULT_HOST}"
 PORT="${BACKEND_PORT:-8000}"
 
-# In device mode, localhost bind is never reachable from a phone.
-if [ "$MODE" = "device" ] || [ "$MODE" = "lan" ]; then
+if [ -n "$HOST_OVERRIDE" ]; then
+  HOST="$HOST_OVERRIDE"
+fi
+if [ -n "$PORT_OVERRIDE" ]; then
+  PORT="$PORT_OVERRIDE"
+fi
+
+if [ "$MODE" = "device" ]; then
   case "$HOST" in
     127.0.0.1|localhost)
-      echo "BACKEND_HOST=$HOST is not reachable from a real device; using 0.0.0.0 for LAN mode."
+      echo "BACKEND_HOST=$HOST is not reachable from a real device; using 0.0.0.0."
       HOST="0.0.0.0"
       ;;
   esac
 fi
 
 echo "QuoteApp backend mode: $MODE"
-echo "Uvicorn bind address: http://$HOST:$PORT"
+echo "Backend directory: $BACKEND_DIR"
+echo "Uvicorn bind URL: http://$HOST:$PORT"
 
-if [ "$MODE" = "device" ] || [ "$MODE" = "lan" ]; then
-  if LAN_IP="$(detect_lan_ip)"; then
-    echo "Device test URL: http://$LAN_IP:$PORT"
-    echo "Set QUOTEAPP_BACKEND_BASE_URL=http://$LAN_IP:$PORT in your iOS runtime config."
-  else
-    echo "Device test URL: (LAN IP auto-detect failed)"
-    echo "Tip: set BACKEND_HOST manually or inspect your Mac LAN IP and use http://<LAN_IP>:$PORT"
-  fi
+if ! "$ROOT_DIR/scripts/check_env.sh" >/dev/null 2>&1; then
+  echo "Environment check: incomplete (run ./scripts/check_env.sh for details)."
 else
-  echo "Simulator/local URL: http://127.0.0.1:$PORT"
+  echo "Environment check: ready for full end-to-end runs."
 fi
 
-exec python -m uvicorn app.main:app --host "$HOST" --port "$PORT" --reload
+if [ "$MODE" = "device" ]; then
+  if LAN_IP="$(detect_lan_ip)"; then
+    echo "Device test URL: http://$LAN_IP:$PORT"
+    echo "Use in Xcode scheme: QUOTEAPP_BACKEND_BASE_URL=http://$LAN_IP:$PORT"
+  else
+    echo "Device test URL: unable to auto-detect LAN IP"
+    echo "Use your Mac LAN IP manually: QUOTEAPP_BACKEND_BASE_URL=http://<LAN_IP>:$PORT"
+  fi
+else
+  echo "Simulator URL: http://127.0.0.1:$PORT"
+fi
+
+uvicorn_cmd=(python -m uvicorn app.main:app --host "$HOST" --port "$PORT")
+if [ "$RELOAD" -eq 1 ]; then
+  uvicorn_cmd+=(--reload)
+fi
+
+exec "${uvicorn_cmd[@]}"

@@ -62,9 +62,11 @@ struct MainScreen: View {
                 .buttonStyle(.bordered)
             }
 
-            Text(viewModel.liveKitStatusText)
-                .font(.footnote)
-                .foregroundStyle(viewModel.isLiveKitStatusError ? .orange : .secondary)
+            if let liveKitStatus = viewModel.liveKitStatusBannerText {
+                Text(liveKitStatus)
+                    .font(.footnote)
+                    .foregroundStyle(viewModel.isLiveKitStatusError ? .orange : .secondary)
+            }
 
             QuoteTextView(tokens: viewModel.currentQuoteTokens)
 

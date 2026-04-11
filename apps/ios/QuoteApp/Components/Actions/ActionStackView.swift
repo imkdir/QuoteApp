@@ -101,7 +101,7 @@ struct ActionStackView_Previews: PreviewProvider {
                     ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .none,
-                    hasAttemptHistory: false
+                    hasVisibleReviewState: false
                 ),
                 title: "Speaking (No Attempts)"
             )
@@ -112,7 +112,7 @@ struct ActionStackView_Previews: PreviewProvider {
                     ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .info,
-                    hasAttemptHistory: true
+                    hasVisibleReviewState: true
                 ),
                 title: "Speaking (With History)"
             )
@@ -123,7 +123,7 @@ struct ActionStackView_Previews: PreviewProvider {
                     ),
                     localRecordingDraftState: .recording,
                     latestAttemptReviewState: .info,
-                    hasAttemptHistory: true
+                    hasVisibleReviewState: true
                 ),
                 title: "Recording Draft"
             )
@@ -134,7 +134,7 @@ struct ActionStackView_Previews: PreviewProvider {
                     ),
                     localRecordingDraftState: .stopped,
                     latestAttemptReviewState: .info,
-                    hasAttemptHistory: true
+                    hasVisibleReviewState: true
                 ),
                 title: "Send Ready Draft"
             )
@@ -145,7 +145,7 @@ struct ActionStackView_Previews: PreviewProvider {
                     ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .loading,
-                    hasAttemptHistory: true
+                    hasVisibleReviewState: true
                 ),
                 title: "Latest Loading"
             )
@@ -156,7 +156,7 @@ struct ActionStackView_Previews: PreviewProvider {
                     ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .info,
-                    hasAttemptHistory: true
+                    hasVisibleReviewState: true
                 ),
                 title: "Latest Info"
             )
@@ -167,7 +167,7 @@ struct ActionStackView_Previews: PreviewProvider {
                     ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .perfect,
-                    hasAttemptHistory: true
+                    hasVisibleReviewState: true
                 ),
                 title: "Latest Perfect"
             )
@@ -178,7 +178,7 @@ struct ActionStackView_Previews: PreviewProvider {
                     ),
                     localRecordingDraftState: nil,
                     latestAttemptReviewState: .unavailable,
-                    hasAttemptHistory: true
+                    hasVisibleReviewState: true
                 ),
                 title: "Latest Unavailable"
             )

@@ -1,4 +1,4 @@
-"""LiveKit token API route scaffold for MVP."""
+"""LiveKit token API route for QuoteApp."""
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field

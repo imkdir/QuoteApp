@@ -1,4 +1,4 @@
-"""LiveKit token scaffold for QuoteApp backend MVP."""
+"""LiveKit token helpers for QuoteApp backend."""
 
 from dataclasses import dataclass
 from typing import Optional

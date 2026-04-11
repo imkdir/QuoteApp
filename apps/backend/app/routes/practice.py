@@ -1,9 +1,9 @@
-"""Practice session APIs for mock-backed session and latest-result integration."""
+"""Practice session APIs for end-to-end quote playback and review loop."""
 
 import base64
 import json
 import logging
-from fastapi import APIRouter, Body, Header, HTTPException, Query, Response, status
+from fastapi import APIRouter, Body, Header, HTTPException, Response, status
 from typing import Optional
 
 from app.agents.speaking_tutor_agent import SpeakingTutorAgentRuntime
@@ -54,7 +54,6 @@ def start_practice_session(
     session = create_practice_session(
         quote_id=payload.quote_id,
         quote_text=payload.quote_text,
-        mock_result=payload.mock_result,
     )
     tutor_context = _TUTOR_RUNTIME.ensure_session_tutor(
         session_id=session.session_id,
@@ -101,7 +100,6 @@ def start_practice_session(
 )
 def get_latest_attempt_result(
     session_id: str,
-    mock_result: Optional[AnalysisState] = Query(default=None),
 ) -> LatestAttemptResultResponse:
     """Returns the latest attempt review state for the requested session."""
 
@@ -127,7 +125,7 @@ def get_latest_attempt_result(
             },
         )
 
-    response = build_latest_result_response(session=session, override_state=mock_result)
+    response = build_latest_result_response(session=session)
     _TUTOR_RUNTIME.note_latest_attempt(
         session_id=session_id,
         attempt_id=response.attempt_id,
@@ -289,6 +287,7 @@ def get_tutor_quote_audio_artifact(session_id: str) -> Response:
 
     headers = {
         "X-QuoteApp-Playback-Identity": artifact.playback_identity,
+        "X-QuoteApp-Backend-Cache": "hit" if artifact.cache_hit else "miss",
         "X-QuoteApp-Word-Count": str(max(0, artifact.word_count)),
         "X-QuoteApp-Estimated-Duration-Sec": f"{max(0.0, artifact.estimated_duration_sec):.4f}",
         "X-QuoteApp-Rhythm-B64": base64.urlsafe_b64encode(

@@ -14,11 +14,12 @@ import logging
 import wave
 import urllib.error
 import urllib.request
+from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from threading import Event, Lock
 from time import perf_counter, sleep
-from typing import Literal
+from typing import Literal, Optional, Tuple
 
 from app.agents.prompts import build_tutor_quote_script, build_tutor_reading_instruction
 from app.config import Settings, get_settings
@@ -45,6 +46,7 @@ _CLIENT_AUDIO_READY_TOPIC = "quoteapp.tutor.audio.ready"
 _CLIENT_AUDIO_READY_TIMEOUT_SECONDS = 0.6
 _PLAYBACK_GENERATION_VERSION = "quote_tutor_playback_v1"
 _RHYTHM_PROFILE_VERSION = "quote_rhythm_v1"
+_MAX_AUDIO_ARTIFACT_CACHE_ENTRIES = 48
 
 
 @dataclass(frozen=True)
@@ -102,9 +104,9 @@ class TutorSessionContext:
     tutor_identity: str
     status: TutorStatus = "pending"
     status_message: str = "Tutor is pending startup."
-    tts_voice_name: str | None = None
-    latest_attempt_id: str | None = None
-    latest_review_state: str | None = None
+    tts_voice_name: Optional[str] = None
+    latest_attempt_id: Optional[str] = None
+    latest_review_state: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -117,6 +119,7 @@ class TutorPlaybackAudioArtifact:
     estimated_duration_sec: float
     rhythm_word_end_times: list[float]
     wav_bytes: bytes
+    cache_hit: bool = False
 
 
 class SpeakingTutorAgentRuntime:
@@ -127,6 +130,7 @@ class SpeakingTutorAgentRuntime:
         self._playback_stop_events: dict[str, Event] = {}
         self._playback_jobs: dict[str, Future[None]] = {}
         self._tts_profiles: dict[str, TutorTTSProfile] = {}
+        self._audio_artifact_cache: OrderedDict[str, TutorPlaybackAudioArtifact] = OrderedDict()
         self._lock = Lock()
         self._executor = ThreadPoolExecutor(
             max_workers=2,
@@ -149,7 +153,7 @@ class SpeakingTutorAgentRuntime:
             if existing is not None:
                 return existing
 
-            profile: TutorTTSProfile | None
+            profile: Optional[TutorTTSProfile]
             status: TutorStatus
             status_message: str
             try:
@@ -257,6 +261,23 @@ class SpeakingTutorAgentRuntime:
             raise RuntimeError("Selected quote text is empty; tutor playback requires quote text.")
 
         profile = self._ensure_tts_profile(session_id=session_id, settings=settings)
+        playback_identity = _build_playback_identity(
+            quote_id=context.quote_id,
+            quote_text=context.quote_text,
+            tts_profile=profile,
+        )
+        cached_artifact = self._cached_audio_artifact(playback_identity=playback_identity)
+        if cached_artifact is not None:
+            return TutorPlaybackAudioArtifact(
+                session_id=session_id,
+                playback_identity=playback_identity,
+                word_count=cached_artifact.word_count,
+                estimated_duration_sec=cached_artifact.estimated_duration_sec,
+                rhythm_word_end_times=cached_artifact.rhythm_word_end_times,
+                wav_bytes=cached_artifact.wav_bytes,
+                cache_hit=True,
+            )
+
         try:
             pcm_bytes, sample_rate, num_channels = _synthesize_quote_audio(
                 quote_script,
@@ -279,13 +300,9 @@ class SpeakingTutorAgentRuntime:
             else max(0.2, word_count * 0.28)
         )
 
-        return TutorPlaybackAudioArtifact(
+        artifact = TutorPlaybackAudioArtifact(
             session_id=session_id,
-            playback_identity=_build_playback_identity(
-                quote_id=context.quote_id,
-                quote_text=context.quote_text,
-                tts_profile=profile,
-            ),
+            playback_identity=playback_identity,
             word_count=word_count,
             estimated_duration_sec=max(0.0, estimated_duration_sec),
             rhythm_word_end_times=_build_word_rhythm_profile(
@@ -293,7 +310,33 @@ class SpeakingTutorAgentRuntime:
                 estimated_duration_sec=max(0.0, estimated_duration_sec),
             ),
             wav_bytes=wav_bytes,
+            cache_hit=False,
         )
+        self._store_audio_artifact(
+            playback_identity=playback_identity,
+            artifact=artifact,
+        )
+        return artifact
+
+    def _cached_audio_artifact(self, *, playback_identity: str) -> Optional[TutorPlaybackAudioArtifact]:
+        with self._lock:
+            artifact = self._audio_artifact_cache.get(playback_identity)
+            if artifact is None:
+                return None
+            self._audio_artifact_cache.move_to_end(playback_identity, last=True)
+            return artifact
+
+    def _store_audio_artifact(
+        self,
+        *,
+        playback_identity: str,
+        artifact: TutorPlaybackAudioArtifact,
+    ) -> None:
+        with self._lock:
+            self._audio_artifact_cache[playback_identity] = artifact
+            self._audio_artifact_cache.move_to_end(playback_identity, last=True)
+            while len(self._audio_artifact_cache) > _MAX_AUDIO_ARTIFACT_CACHE_ENTRIES:
+                self._audio_artifact_cache.popitem(last=False)
 
     def _clear_session_future(
         self,
@@ -345,7 +388,7 @@ class SpeakingTutorAgentRuntime:
             context.latest_attempt_id = attempt_id
             context.latest_review_state = review_state
 
-    def context_for_session(self, session_id: str) -> TutorSessionContext | None:
+    def context_for_session(self, session_id: str) -> Optional[TutorSessionContext]:
         """Returns a snapshot of tutor context for one session."""
 
         with self._lock:
@@ -354,7 +397,7 @@ class SpeakingTutorAgentRuntime:
                 return None
             return TutorSessionContext(**context.__dict__)
 
-    def tutor_availability(self, session_id: str) -> tuple[bool, str | None]:
+    def tutor_availability(self, session_id: str) -> Tuple[bool, Optional[str]]:
         """Reports whether the tutor path is available for review shaping."""
 
         with self._lock:
@@ -443,6 +486,17 @@ class SpeakingTutorAgentRuntime:
         if not quote_script:
             raise RuntimeError("Selected quote text is empty; tutor playback requires quote text.")
         trace.mark("quote_script_ready", words=max(1, len(quote_script.split())))
+        artifact = self.build_tutor_audio_artifact(
+            session_id=context.session_id,
+            settings=settings,
+        )
+        trace.mark(
+            "audio_artifact_ready",
+            playback_identity=artifact.playback_identity,
+            cache_hit=artifact.cache_hit,
+            bytes=len(artifact.wav_bytes),
+        )
+        pcm_bytes, sample_rate, num_channels = _extract_pcm_from_wav(artifact.wav_bytes)
         asyncio.run(
             _publish_quote_audio_to_livekit_room(
                 url=token_result.url,
@@ -452,6 +506,9 @@ class SpeakingTutorAgentRuntime:
                 tts_profile=tts_profile,
                 stop_event=stop_event,
                 trace=trace,
+                pre_synthesized_audio=(pcm_bytes, sample_rate, num_channels),
+                precomputed_word_count=artifact.word_count,
+                precomputed_estimated_duration_sec=artifact.estimated_duration_sec,
             )
         )
 
@@ -465,6 +522,9 @@ async def _publish_quote_audio_to_livekit_room(
     tts_profile: TutorTTSProfile,
     stop_event: Event,
     trace: PlaybackLatencyTrace,
+    pre_synthesized_audio: Optional[Tuple[bytes, int, int]] = None,
+    precomputed_word_count: Optional[int] = None,
+    precomputed_estimated_duration_sec: Optional[float] = None,
 ) -> None:
     """Connects to LiveKit and publishes tutor audio, with optional companion metadata."""
 
@@ -479,18 +539,28 @@ async def _publish_quote_audio_to_livekit_room(
     room = rtc.Room()
     trace.mark("room_connect_start")
     connect_task = asyncio.create_task(room.connect(url, token))
-    synthesize_task = asyncio.create_task(
-        asyncio.to_thread(
-            _synthesize_quote_audio,
-            quote_script,
-            tts_profile=tts_profile,
-            trace=trace,
-        )
-    )
-
     try:
-        audio_bytes, sample_rate, num_channels = await synthesize_task
-        trace.mark("audio_ready", bytes=len(audio_bytes), sample_rate=sample_rate, channels=num_channels)
+        if pre_synthesized_audio is None:
+            synthesize_task = asyncio.create_task(
+                asyncio.to_thread(
+                    _synthesize_quote_audio,
+                    quote_script,
+                    tts_profile=tts_profile,
+                    trace=trace,
+                )
+            )
+            audio_bytes, sample_rate, num_channels = await synthesize_task
+            trace.mark("audio_ready", bytes=len(audio_bytes), sample_rate=sample_rate, channels=num_channels)
+        else:
+            audio_bytes, sample_rate, num_channels = pre_synthesized_audio
+            trace.mark(
+                "audio_ready",
+                bytes=len(audio_bytes),
+                sample_rate=sample_rate,
+                channels=num_channels,
+                source="pre_synthesized",
+            )
+
         connect_timeout = max(8.0, min(45.0, tts_profile.timeout_seconds))
         await asyncio.wait_for(connect_task, timeout=connect_timeout)
         trace.mark("room_connected")
@@ -504,18 +574,23 @@ async def _publish_quote_audio_to_livekit_room(
         raise
 
     samples_per_channel = len(audio_bytes) // (2 * max(1, num_channels))
-    word_count = max(1, len(quote_script.split()))
-    estimated_duration_sec = (
-        float(samples_per_channel) / float(sample_rate)
-        if sample_rate > 0
-        else max(0.2, word_count * 0.28)
+    word_count = max(1, precomputed_word_count or len(quote_script.split()))
+    estimated_duration_sec = max(
+        0.0,
+        precomputed_estimated_duration_sec
+        if precomputed_estimated_duration_sec is not None
+        else (
+            float(samples_per_channel) / float(sample_rate)
+            if sample_rate > 0
+            else max(0.2, word_count * 0.28)
+        ),
     )
 
     try:
         local_participant = getattr(room, "local_participant", None)
         publish_data = getattr(local_participant, "publish_data", None) if local_participant else None
         client_audio_ready_event = asyncio.Event()
-        expected_publication_sid: str | None = None
+        expected_publication_sid: Optional[str] = None
 
         def _on_data_received(packet) -> None:
             topic = str(getattr(packet, "topic", "") or "")
@@ -741,7 +816,7 @@ def _synthesize_quote_audio(
     *,
     tts_profile: TutorTTSProfile,
     emit_style_log: bool = True,
-    trace: PlaybackLatencyTrace | None = None,
+    trace: Optional[PlaybackLatencyTrace] = None,
 ) -> tuple[bytes, int, int]:
     if emit_style_log:
         logger.info(
@@ -1244,9 +1319,9 @@ async def _publish_playback_event(
     event: str,
     word_count: int,
     estimated_duration_sec: float,
-    voice_name: str | None = None,
-    trace: PlaybackLatencyTrace | None = None,
-    trace_stage: str | None = None,
+    voice_name: Optional[str] = None,
+    trace: Optional[PlaybackLatencyTrace] = None,
+    trace_stage: Optional[str] = None,
 ) -> None:
     if publish_data is None:
         return
@@ -1278,8 +1353,8 @@ async def _publish_tutor_script_metadata(
     *,
     publish_data,
     quote_script: str,
-    trace: PlaybackLatencyTrace | None = None,
-    trace_stage: str | None = None,
+    trace: Optional[PlaybackLatencyTrace] = None,
+    trace_stage: Optional[str] = None,
 ) -> None:
     """Publishes companion text metadata; tutor audio remains the primary playback source."""
 

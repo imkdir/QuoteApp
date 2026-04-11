@@ -1,4 +1,4 @@
-"""FastAPI entrypoint for QuoteApp backend MVP."""
+"""FastAPI entrypoint for QuoteApp backend."""
 
 from fastapi import FastAPI
 

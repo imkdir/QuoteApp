@@ -1,4 +1,4 @@
-"""Marked token models used in mock practice analysis responses."""
+"""Marked token models used in practice analysis responses."""
 
 from pydantic import BaseModel, Field
 

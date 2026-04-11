@@ -1,9 +1,9 @@
-"""In-memory quote provider for the MVP backend."""
+"""In-memory quote provider for the QuoteApp backend."""
 
 from app.models.quote import Quote
 
 
-_MOCK_QUOTES: list[Quote] = [
+_QUOTES: list[Quote] = [
     Quote(
         id="gatsby-01",
         preview="So we beat on, boats against the current...",
@@ -28,6 +28,6 @@ _MOCK_QUOTES: list[Quote] = [
 
 
 def list_quotes() -> list[Quote]:
-    """Returns all mock quotes for the current MVP."""
+    """Returns all available quotes for the current build."""
 
-    return _MOCK_QUOTES
+    return _QUOTES

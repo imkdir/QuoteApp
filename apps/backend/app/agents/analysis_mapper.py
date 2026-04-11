@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
+from typing import Optional
 
 from app.agents.prompts import (
     build_info_feedback,
@@ -21,11 +22,11 @@ _MIN_AUDIO_BYTES = 2048
 class AttemptAnalysisInput:
     """Minimal input required for backend review shaping."""
 
-    quote_text: str | None
+    quote_text: Optional[str]
     attempt_id: str
     audio_size_bytes: int
     tutor_available: bool
-    failure_reason: str | None = None
+    failure_reason: Optional[str] = None
 
 
 def loading_result() -> TutorReviewResult:
@@ -79,7 +80,7 @@ def map_attempt_to_review(payload: AttemptAnalysisInput) -> TutorReviewResult:
     )
 
 
-def _normalized_quote_tokens(quote_text: str | None) -> list[str]:
+def _normalized_quote_tokens(quote_text: Optional[str]) -> list[str]:
     if not quote_text:
         return []
 

@@ -1,4 +1,4 @@
-"""Quote API routes for MVP mock quote retrieval."""
+"""Quote API routes for QuoteApp practice selection."""
 
 from fastapi import APIRouter
 
@@ -10,6 +10,6 @@ router = APIRouter(prefix="/quotes", tags=["quotes"])
 
 @router.get("", response_model=list[Quote])
 def get_quotes() -> list[Quote]:
-    """Returns in-memory mock quotes."""
+    """Returns the in-memory quote catalog."""
 
     return list_quotes()

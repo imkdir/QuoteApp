@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ReviewStatusButton: View {
     enum State: Equatable {
-        case review
         case reviewing
         case reviewedInfo
         case reviewedPerfect
@@ -10,8 +9,6 @@ struct ReviewStatusButton: View {
 
         var title: String {
             switch self {
-            case .review:
-                return "Review"
             case .reviewing:
                 return "Reviewing"
             case .reviewedInfo:
@@ -25,7 +22,7 @@ struct ReviewStatusButton: View {
 
         var systemImage: String {
             switch self {
-            case .review, .reviewing:
+            case .reviewing:
                 return "arrow.down.message.fill"
             case .reviewedInfo:
                 return "ellipsis.message.fill"
@@ -81,7 +78,7 @@ struct ReviewStatusButton: View {
         switch state {
         case .reviewing:
             return "Review is in progress"
-        case .reviewedInfo, .reviewedPerfect, .unavailable, .review:
+        case .reviewedInfo, .reviewedPerfect, .unavailable:
             return "Opens review details"
         }
     }

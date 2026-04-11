@@ -12,7 +12,7 @@ struct ActionToolbarState: Equatable {
     let playbackState: PlaybackState
     let localRecordingDraftState: LocalRecordingDraftState?
     let latestAttemptReviewState: LatestAttemptReviewState
-    let hasAttemptHistory: Bool
+    let hasVisibleReviewState: Bool
 
     var isInRecordingExclusiveMode: Bool {
         localRecordingDraftState != nil
@@ -26,8 +26,10 @@ struct ActionToolbarState: Equatable {
         switch playbackState {
         case .playing:
             return .pause
-        case .idle, .paused:
+        case .idle:
             return .play
+        case .paused:
+            return .repeatPlayback
         case .finishedAtEnd:
             return .repeatPlayback
         }
@@ -38,13 +40,13 @@ struct ActionToolbarState: Equatable {
             return nil
         }
 
-        guard hasAttemptHistory || latestAttemptReviewState == .loading else {
+        guard hasVisibleReviewState else {
             return nil
         }
 
         switch latestAttemptReviewState {
         case .none:
-            return .review
+            return nil
         case .loading:
             return .reviewing
         case .info:

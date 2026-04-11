@@ -1,4 +1,4 @@
-"""Practice session request/response and in-memory session models for MVP."""
+"""Practice session request/response and in-memory session models."""
 
 from datetime import datetime, timezone
 from typing import Optional
@@ -36,11 +36,10 @@ class StartPracticeSessionRequest(BaseModel):
 
     quote_id: str = Field(min_length=1, max_length=128)
     quote_text: Optional[str] = Field(default=None, min_length=1, max_length=2000)
-    mock_result: Optional[AnalysisState] = None
 
 
 class StartPracticeSessionResponse(BaseModel):
-    """Session start response used by iOS before full LiveKit wiring."""
+    """Session start response used by iOS practice flow."""
 
     session_id: str
     quote_id: str

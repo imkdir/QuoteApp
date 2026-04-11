@@ -61,10 +61,6 @@ struct PracticeSession: Equatable {
         latestAttempt?.analysis
     }
 
-    var hasAttemptHistory: Bool {
-        !attempts.isEmpty
-    }
-
     var hasLocalRecordingDraft: Bool {
         localRecordingDraft != nil
     }

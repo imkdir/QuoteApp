@@ -39,8 +39,6 @@ final class MainViewModel: ObservableObject {
     private var sessionStartTask: Task<PracticeSessionStart, Error>?
     private var resultPollingTask: Task<Void, Never>?
     private var activeLoadingAttemptID: UUID?
-    private var nextMockResultCursor: Int
-    private let mockResultOrder: [AnalysisState] = [.info, .perfect, .unavailable]
     private let participantIdentity: String
     private var lastObservedPlaybackState: PlaybackState
     private var isTutorPlaybackCommandInFlight = false
@@ -63,7 +61,6 @@ final class MainViewModel: ObservableObject {
         feedbackSheetAnalysis: PracticeAnalysis? = nil,
         isLoadingQuotes: Bool = false,
         quoteLoadingErrorMessage: String? = nil,
-        nextMockResultCursor: Int = 0,
         participantIdentity: String = "ios-\(UUID().uuidString.prefix(8))"
     ) {
         self.quotes = quotes
@@ -82,7 +79,6 @@ final class MainViewModel: ObservableObject {
         self.tutorPlaybackState = self.tutorPlaybackManager.playbackState
         self.isLoadingQuotes = isLoadingQuotes
         self.quoteLoadingErrorMessage = quoteLoadingErrorMessage
-        self.nextMockResultCursor = nextMockResultCursor
         self.participantIdentity = participantIdentity
         self.lastObservedPlaybackState = self.tutorPlaybackManager.playbackState
         self.liveKitConnectionState = liveKitSessionManager?.connectionState ?? .disconnected
@@ -110,7 +106,7 @@ final class MainViewModel: ObservableObject {
                 playbackState: tutorPlaybackState,
                 localRecordingDraftState: nil,
                 latestAttemptReviewState: .none,
-                hasAttemptHistory: false
+                hasVisibleReviewState: false
             )
         }
 
@@ -118,7 +114,7 @@ final class MainViewModel: ObservableObject {
             playbackState: tutorPlaybackState,
             localRecordingDraftState: session.localRecordingDraft?.state,
             latestAttemptReviewState: latestAttemptReviewState,
-            hasAttemptHistory: session.hasAttemptHistory
+            hasVisibleReviewState: latestVisibleReviewAttempt != nil
         )
     }
 
@@ -181,18 +177,18 @@ final class MainViewModel: ObservableObject {
         return selectedQuote.makeTokens(spokenCount: spokenWordCount, markedTokenIndexes: markedIndexes)
     }
 
-    var liveKitStatusText: String {
+    var liveKitStatusBannerText: String? {
         switch liveKitConnectionState {
         case .disconnected:
-            return "LiveKit disconnected"
+            return nil
         case .requestingToken:
-            return "LiveKit: requesting token..."
+            return "Preparing LiveKit connection..."
         case let .connecting(room):
-            return "LiveKit: connecting to \(room)"
-        case let .connected(room, identity):
-            return "LiveKit connected (\(identity) in \(room))"
+            return "Connecting to \(room)..."
+        case .connected:
+            return nil
         case let .failed(message):
-            return "LiveKit error: \(message)"
+            return "LiveKit connection error: \(message)"
         }
     }
 
@@ -354,15 +350,7 @@ final class MainViewModel: ObservableObject {
 
             case .idle, .paused, .finishedAtEnd:
                 guard let practiceRepository else {
-                    self.tutorPlaybackManager.beginLocalDevelopmentFallbackPlayback(
-                        wordCount: selectedQuote.wordCount
-                    )
-                    let isRestartFromBeginning =
-                        playbackStateBeforeCommand.isPaused || playbackStateBeforeCommand.isFinishedAtEnd
-                    self.practiceStatusMessage =
-                        isRestartFromBeginning
-                        ? "Development fallback: restarted from the beginning (no backend tutor audio)."
-                        : "Development fallback: local quote timing is active (no backend tutor audio)."
+                    self.practiceStatusMessage = "Tutor playback is unavailable because backend practice services are not configured."
                     return
                 }
 
@@ -463,7 +451,10 @@ final class MainViewModel: ObservableObject {
         stopTutorPlaybackForRecordingPrecedence()
 
         guard let userRecordingManager else {
-            practiceStatusMessage = "Recording started (mock)."
+            updatePracticeSession { session in
+                session.localRecordingDraft = nil
+            }
+            practiceStatusMessage = "Recording is unavailable in this build."
             return
         }
 
@@ -510,15 +501,9 @@ final class MainViewModel: ObservableObject {
 
         guard let userRecordingManager else {
             updatePracticeSession { session in
-                guard var localDraft = session.localRecordingDraft else {
-                    return
-                }
-
-                localDraft.state = .stopped
-                session.localRecordingDraft = localDraft
+                session.localRecordingDraft = nil
             }
-
-            practiceStatusMessage = "Recording stopped. Ready to send (mock)."
+            practiceStatusMessage = "No recording engine is available."
             return
         }
 
@@ -590,7 +575,10 @@ final class MainViewModel: ObservableObject {
               let practiceRepository,
               let analysisPollingService else {
             userRecordingManager?.clearRecording()
-            resolveMockAnalysis(for: attemptID)
+            applyUnavailableResult(
+                toLocalAttemptID: attemptID,
+                message: "Review unavailable. Backend practice services are not configured."
+            )
             return
         }
 
@@ -702,30 +690,6 @@ final class MainViewModel: ObservableObject {
         }
 
         return latestAnalysis.markedNormalizedTokens
-    }
-
-    private func resolveMockAnalysis(for attemptID: UUID) {
-        guard let quote = sessionState.selectedQuote else {
-            return
-        }
-
-        let outcome = mockResultOrder[nextMockResultCursor]
-        nextMockResultCursor = (nextMockResultCursor + 1) % mockResultOrder.count
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-            guard let self else {
-                return
-            }
-
-            guard !self.isAttemptSupersededForUI(attemptID) else {
-                return
-            }
-
-            let analysis = self.mockAnalysis(for: quote, state: outcome)
-            self.updateAnalysis(analysis, forAttemptID: attemptID, backendAttemptID: nil)
-            self.practiceStatusMessage = self.statusMessage(for: outcome)
-            self.activeLoadingAttemptID = nil
-        }
     }
 
     private func ensurePracticeSessionID(for quote: Quote) async throws -> String {
@@ -1145,36 +1109,6 @@ final class MainViewModel: ObservableObject {
         }
     }
 
-    private func mockAnalysis(for quote: Quote, state: AnalysisState) -> PracticeAnalysis {
-        switch state {
-        case .loading:
-            return PracticeAnalysis(
-                state: .loading,
-                feedbackText: "Reviewing your latest attempt."
-            )
-
-        case .info:
-            let markedWords = Array(quote.mockMarkedNormalizedTokens.prefix(3))
-            return PracticeAnalysis(
-                state: .info,
-                markedNormalizedTokens: markedWords,
-                feedbackText: "Good effort. Keep vowels steady and stress the marked words more clearly."
-            )
-
-        case .perfect:
-            return PracticeAnalysis(
-                state: .perfect,
-                feedbackText: "Great pacing and pronunciation. This attempt sounds clear."
-            )
-
-        case .unavailable:
-            return PracticeAnalysis(
-                state: .unavailable,
-                feedbackText: "We could not complete this review for the latest attempt."
-            )
-        }
-    }
-
     private func updatePracticeSession(_ transform: (inout PracticeSession) -> Void) {
         guard case let .practice(currentSession) = sessionState else {
             return
@@ -1264,7 +1198,7 @@ extension MainViewModel {
                 state: .stopped
             )
         }
-        viewModel.practiceStatusMessage = "Recording stopped. Ready to send (mock)."
+        viewModel.practiceStatusMessage = "Recording stopped. Ready to send."
         return viewModel
     }
 
@@ -1285,7 +1219,7 @@ extension MainViewModel {
             return viewModel
         }
 
-        let analysis = viewModel.mockAnalysis(for: quote, state: state)
+        let analysis = previewAnalysis(for: quote, state: state)
         let attempt = PracticeAttempt(recordingReference: "attempt-preview", analysis: analysis)
 
         viewModel.sessionState = .practice(
@@ -1315,13 +1249,54 @@ extension MainViewModel {
     private static func previewStatusMessage(for state: AnalysisState) -> String {
         switch state {
         case .loading:
-            return "Reviewing latest attempt (mock)."
+            return "Reviewing latest attempt."
         case .info:
             return "Reviewed (info): words marked on the quote."
         case .perfect:
             return "Reviewed (perfect): no marked words."
         case .unavailable:
-            return "Review unavailable (mock)."
+            return "Review unavailable."
         }
+    }
+
+    private static func previewAnalysis(for quote: Quote, state: AnalysisState) -> PracticeAnalysis {
+        switch state {
+        case .loading:
+            return PracticeAnalysis(
+                state: .loading,
+                feedbackText: "Reviewing your latest attempt."
+            )
+        case .info:
+            return PracticeAnalysis(
+                state: .info,
+                markedNormalizedTokens: previewMarkedWords(for: quote),
+                feedbackText: "Good effort. Keep vowels steady and stress the marked words more clearly."
+            )
+        case .perfect:
+            return PracticeAnalysis(
+                state: .perfect,
+                feedbackText: "Great pacing and pronunciation. This attempt sounds clear."
+            )
+        case .unavailable:
+            return PracticeAnalysis(
+                state: .unavailable,
+                feedbackText: "We could not complete this review for the latest attempt."
+            )
+        }
+    }
+
+    private static func previewMarkedWords(for quote: Quote) -> [String] {
+        let normalized = quote.fullText
+            .split(whereSeparator: { $0.isWhitespace })
+            .map {
+                $0.lowercased()
+                    .replacingOccurrences(
+                        of: "[^a-z0-9']",
+                        with: "",
+                        options: .regularExpression
+                    )
+            }
+            .filter { !$0.isEmpty }
+        return Array(normalized.prefix(3))
     }
 }

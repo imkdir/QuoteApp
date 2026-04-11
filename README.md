@@ -1,74 +1,140 @@
-<!-- Purpose: Project overview placeholder for QuoteApp MVP. -->
+# QuoteApp
 
-## iOS Backend URL (Local Dev)
+QuoteApp is a native iOS speaking-practice app with a FastAPI backend and LiveKit integration.
 
-- Runtime URL resolution order in `AppEnvironment`:
-  1. `QUOTEAPP_BACKEND_BASE_URL` from process environment / Xcode scheme env vars
-  2. `QUOTEAPP_BACKEND_BASE_URL` from `Info.plist`
-  3. fallback: `http://127.0.0.1:8000`
-- For local-network HTTP development, `NSAppTransportSecurity.NSAllowsLocalNetworking` is enabled for the app target.
+The product loop is quote-centered:
+1. pick a quote,
+2. hear the tutor read that exact quote,
+3. record your own attempt,
+4. submit for review,
+5. see the latest attempt result (`info`, `perfect`, or `unavailable`) directly on the quote surface.
 
-### Simulator
+This is intentionally not a generic chat app. It is a focused quote-reading practice loop.
 
-1. Start backend in simulator mode:
-   - `./scripts/run_backend.sh`
-2. Run iOS app in Simulator (no URL override needed; fallback works).
+## Architecture Overview
 
-### Real Device
+- `apps/ios/QuoteApp`:
+  - SwiftUI single-screen, multi-phase experience (`start` -> `practice`)
+  - `MainViewModel` owns state orchestration for playback, local recording draft, and latest-attempt review ownership
+  - local recording with `AVAudioRecorder`
+  - tutor playback driven from backend-generated audio artifacts, with device-side cache reuse
+  - LiveKit connection plumbing for room/session lifecycle and tutor playback metadata
+- `apps/backend`:
+  - FastAPI API for quotes, practice session lifecycle, submission, and polling
+  - backend LiveKit token minting (`/livekit/token`)
+  - backend tutor runtime that generates tutor quote audio from backend TTS providers
+  - backend result shaping into app-facing states (`loading`, `info`, `perfect`, `unavailable`)
+  - backend-generated tutor audio artifact identity + cache for replay efficiency
 
-1. Start backend in device/LAN mode:
-   - `BACKEND_MODE=device ./scripts/run_backend.sh`
-2. Copy the printed `Device test URL` (example: `http://192.168.1.23:8000`).
-3. In Xcode scheme for `QuoteApp`, set env var:
-   - `QUOTEAPP_BACKEND_BASE_URL=http://192.168.1.23:8000`
-4. Run on physical device (same Wi-Fi/LAN as your Mac).
+### Playback Contract (Important)
 
-## LiveKit Notes (MVP Plumbing)
+- Backend-generated tutor audio is the primary playback path.
+- Transcript/timing/data-channel output is secondary metadata only.
+- Tutor playback speaks only the exact selected quote text.
+- The app does not use local iOS TTS or macOS `say` as the primary tutor voice path.
+- Device-side caching is an optimization on top of backend-generated audio, not a replacement for backend voice generation.
 
-- iOS now requests LiveKit tokens from `POST /livekit/token` via `LiveKitTokenProvider`.
-- `LiveKitSessionManager` exposes connection lifecycle states:
-  - `disconnected`
-  - `requestingToken`
-  - `connecting`
-  - `connected`
-  - `failed`
-- In this workspace build, the LiveKit SDK package is optional. The app will still compile and will surface a clear failure state if the SDK is not linked.
+## Requirements
 
-## Backend Tutor Agent (Request 12 Draft Path)
+- macOS with Xcode 15+ (tested with iOS target 16.0)
+- Python 3.11+
+- LiveKit project credentials
+- At least one backend TTS credential:
+  - `OPENAI_API_KEY`, or
+  - `GEMINI_API_KEY`
 
-- Practice session start now creates backend tutor context:
-  - session id
-  - LiveKit room name (`practice-<quote_id>-<session_id>` sanitized)
-  - selected quote text
-- The backend starts a tutor runtime worker per session that attempts to:
-  - join the LiveKit room as `tutor-<session-prefix>`
-  - synthesize and publish quote audio from backend TTS inference (`/audio/speech`) as the primary tutor voice path
-  - publish quote script metadata (`quoteapp.tutor.quote_script`) only as companion data after audio starts
-- Tutor playback speech content:
-  - backend speaks only the selected quote text (no preamble/instructions)
-  - punctuation and meaningful line breaks are preserved for natural phrasing
-  - backend strips wrapper-only markdown artifacts before synthesis
-  - backend picks TTS provider from available credentials (`OPENAI_API_KEY` or `GEMINI_API_KEY`) when `TUTOR_TTS_PROVIDER=auto`
-  - voice/model are configurable via `TUTOR_TTS_PROVIDER`, `TUTOR_TTS_MODEL`, `TUTOR_TTS_VOICE`
-  - duplicate Play requests while a tutor playback job is already running are ignored
-  - playback startup latency stages are logged (request, audio ready, room connect/publish, first audio frame, started event)
-  - startup path avoids blocking on script metadata publish and uses reduced preroll buffering
-- Learner audio submission:
-  - `POST /practice/session/{session_id}/attempt/submit` with raw bytes (`application/octet-stream`)
-  - backend stores audio under temp directory `quoteapp-submissions/<session_id>/`
-  - backend creates a new loading attempt, then resolves it asynchronously into:
-    - `info`
-    - `perfect`
-    - `unavailable`
-- If tutor runtime or review pipeline fails, attempt result maps to `unavailable`.
+## Environment Setup
 
-### Optional standalone tutor process entrypoint
+1. Prepare backend environment file:
+   - `apps/backend/.env` (or run `./scripts/setup_backend.sh` to copy from `.env.example`)
+2. Fill required values:
+   - `LIVEKIT_URL`
+   - `LIVEKIT_API_KEY`
+   - `LIVEKIT_API_SECRET`
+   - `OPENAI_API_KEY` or `GEMINI_API_KEY`
+3. Optional tuning:
+   - `TUTOR_TTS_PROVIDER`, `TUTOR_TTS_MODEL`, `TUTOR_TTS_VOICE`, `TUTOR_TTS_SPEED`
 
-You can run one tutor session worker directly:
+Run a readiness check anytime:
 
 ```bash
-PYTHONPATH=apps/backend python -m app.agents.speaking_tutor_agent \
-  --session-id <session_id> \
-  --room-name <room_name> \
-  --quote-text "Your selected quote"
+./scripts/check_env.sh
 ```
+
+## Backend Setup and Run
+
+Initial setup:
+
+```bash
+./scripts/setup_backend.sh
+```
+
+### Simulator / Local Backend Run
+
+```bash
+./scripts/run_backend.sh --simulator
+```
+
+- Binds to `127.0.0.1:8000` by default.
+- iOS Simulator can use `http://127.0.0.1:8000` directly.
+
+### Real Device / LAN Backend Run
+
+```bash
+./scripts/run_backend.sh --device
+```
+
+- Binds to `0.0.0.0`.
+- Script prints `Device test URL: http://<LAN_IP>:8000`.
+- Use that URL in Xcode scheme env var:
+  - `QUOTEAPP_BACKEND_BASE_URL=http://<LAN_IP>:8000`
+
+## iOS Run
+
+1. From `apps/ios/QuoteApp`, ensure project is generated/updated:
+
+```bash
+xcodegen generate
+```
+
+2. Open `apps/ios/QuoteApp/QuoteApp.xcodeproj` in Xcode.
+3. Select scheme `QuoteApp`.
+4. Configure backend base URL when needed:
+   - Simulator: default fallback is `http://127.0.0.1:8000`
+   - Device: set `QUOTEAPP_BACKEND_BASE_URL` to printed LAN URL
+5. Run on simulator or device.
+
+## Final Runnable Path
+
+1. Launch backend (`./scripts/run_backend.sh --simulator` or `--device`).
+2. Launch iOS app.
+3. Tap **Choose a quote**.
+4. Select a quote (backend `/quotes`).
+5. Tap **Play/Repeat** (backend tutor audio artifact playback; quote darkening is playback-driven).
+6. Tap **Record** (active playback is stopped and moved to finished-at-end behavior).
+7. Tap **Stop** then **Send** (local recording submitted via `/practice/session/{id}/attempt/submit`).
+8. App polls `/practice/session/{id}/result` until `info`, `perfect`, or `unavailable`.
+9. Review state reflects the latest visible attempt; marked words are shown inline for `info`.
+
+## Key Tradeoffs
+
+- One-screen multi-phase flow instead of multiple pages, to keep user loop tight.
+- Review output is quote-surface-first, with minimal secondary sheet details.
+- Review logic is intentionally modest and honest (coarse correctness states, no phoneme-level claims).
+- Backend-generated audio path is prioritized over local synthesis.
+- Playback cache strategy:
+  - backend identity + backend artifact cache,
+  - plus device-side cached artifact reuse.
+
+## Known Limitations
+
+- Quote catalog is in-memory and small.
+- Practice/session data is in-memory; no persistence or auth.
+- Review shaping is deterministic heuristic logic, not full pronunciation scoring.
+- LiveKit SDK availability and network setup are required for full room behavior.
+- Device/LAN testing depends on local network reachability and firewall settings.
+
+## Project Notes
+
+- `pyrightconfig.json` at repo root is the backend Python analysis source of truth.
+- Xcode generation is kept deterministic via `apps/ios/QuoteApp/project.yml`.

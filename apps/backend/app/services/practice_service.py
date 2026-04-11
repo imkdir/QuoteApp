@@ -1,4 +1,4 @@
-"""In-memory practice session storage for the MVP backend."""
+"""In-memory practice session storage and submission handling."""
 
 from __future__ import annotations
 
@@ -40,10 +40,8 @@ def create_practice_session(
     *,
     quote_id: str,
     quote_text: Optional[str] = None,
-    mock_result: Optional[AnalysisState] = None,
 ) -> PracticeSession:
     """Creates an empty in-memory practice session for one quote."""
-    _ = mock_result
 
     session_id = str(uuid4())
     room_name = make_livekit_room_name(quote_id=quote_id, session_id=session_id)
@@ -146,7 +144,7 @@ def update_tutor_status(
     *,
     session_id: str,
     status: str,
-    message: str | None = None,
+    message: Optional[str] = None,
 ) -> None:
     """Updates inspectable tutor runtime status for a session."""
 
@@ -198,7 +196,7 @@ def _resolve_review_for_attempt(
     attempt_id: str,
     audio_bytes: bytes,
     tutor_available: bool,
-    tutor_failure_reason: str | None,
+    tutor_failure_reason: Optional[str],
 ) -> None:
     """Background review worker for one submitted learner attempt."""
 
