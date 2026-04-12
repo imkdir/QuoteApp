@@ -36,6 +36,7 @@ targets:
       - path: LiveKit
       - path: Theme
       - path: PreviewSupport
+      - path: AppIcon.icon
     dependencies:
       - package: LiveKit
         product: LiveKit

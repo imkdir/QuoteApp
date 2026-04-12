@@ -7,7 +7,7 @@ struct LiveKitAccessToken {
     let room: String
 }
 
-protocol LiveKitTokenProviding {
+protocol LiveKitTokenProviding: Sendable {
     func fetchToken(identity: String, room: String, name: String?) async throws -> LiveKitAccessToken
 }
 

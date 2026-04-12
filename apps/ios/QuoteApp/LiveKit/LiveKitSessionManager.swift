@@ -19,6 +19,12 @@ enum TutorPlaybackEvent: Equatable {
     case stopped(sessionID: String?)
 }
 
+#if canImport(LiveKit)
+private struct RoomHandle: @unchecked Sendable {
+    let room: Room
+}
+#endif
+
 @MainActor
 final class LiveKitSessionManager: NSObject, ObservableObject {
     @Published private(set) var connectionState: LiveKitConnectionState = .disconnected
@@ -61,20 +67,16 @@ final class LiveKitSessionManager: NSObject, ObservableObject {
         connectionState = .requestingToken
 
         do {
-            let accessToken = try await tokenProvider.fetchToken(
+            let accessToken = try await fetchTokenOffMainThread(
                 identity: identity,
-                room: roomName,
-                name: displayName
+                roomName: roomName,
+                displayName: displayName
             )
 
             connectionState = .connecting(room: accessToken.room)
 
 #if canImport(LiveKit)
-            if room.connectionState != .disconnected {
-                await room.disconnect()
-            }
-
-            try await room.connect(
+            try await reconnectRoomOffMainThread(
                 url: accessToken.url,
                 token: accessToken.token
             )
@@ -93,6 +95,44 @@ final class LiveKitSessionManager: NSObject, ObservableObject {
                 message: error.localizedDescription
             )
         }
+    }
+
+    private func fetchTokenOffMainThread(
+        identity: String,
+        roomName: String,
+        displayName: String?
+    ) async throws -> LiveKitAccessToken {
+        let provider = tokenProvider
+        return try await Task.detached(priority: .userInitiated) {
+            try await provider.fetchToken(
+                identity: identity,
+                room: roomName,
+                name: displayName
+            )
+        }.value
+    }
+
+    private func reconnectRoomOffMainThread(
+        url: String,
+        token: String
+    ) async throws {
+#if canImport(LiveKit)
+        let roomHandle = RoomHandle(room: room)
+        try await Task.detached(priority: .userInitiated) {
+            let liveRoom = roomHandle.room
+            if liveRoom.connectionState != .disconnected {
+                await liveRoom.disconnect()
+            }
+
+            try await liveRoom.connect(
+                url: url,
+                token: token
+            )
+        }.value
+#else
+        _ = url
+        _ = token
+#endif
     }
 
     func disconnect() async {
