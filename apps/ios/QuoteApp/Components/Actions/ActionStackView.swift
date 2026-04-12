@@ -3,6 +3,7 @@ import SwiftUI
 struct ActionStackView: View {
     let toolbarState: ActionToolbarState
     let isPlaybackButtonDisabled: Bool
+    let isRecordButtonDisabled: Bool
     let recordingWaveformLevels: [CGFloat]
     let onPlaybackTapped: () -> Void
     let onRecordTapped: () -> Void
@@ -58,6 +59,8 @@ struct ActionStackView: View {
                 .font(.title3.weight(.semibold))
                 .frame(width: 44, height: 44)
         }
+        .foregroundStyle(.blue)
+        .disabled(isRecordButtonDisabled)
         .buttonStyle(.borderedProminent)
         .accessibilityLabel("Record")
     }
@@ -178,6 +181,7 @@ struct ActionStackView_Previews: PreviewProvider {
         ActionStackView(
             toolbarState: toolbarState,
             isPlaybackButtonDisabled: false,
+            isRecordButtonDisabled: false,
             recordingWaveformLevels: [0.1, 0.15, 0.2, 0.35, 0.5, 0.3, 0.45, 0.22, 0.18, 0.12, 0.4, 0.55, 0.3, 0.2, 0.16, 0.12],
             onPlaybackTapped: {},
             onRecordTapped: {},

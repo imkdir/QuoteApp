@@ -48,7 +48,7 @@ struct PlaybackActionButton: View {
                 .font(.title3.weight(.semibold))
                 .frame(width: 44, height: 44)
         }
-        .foregroundStyle(.blue)
+        .foregroundStyle(isDisabled ? Color(uiColor: .systemGray5) : .blue)
         .disabled(isDisabled)
         .accessibilityLabel(mode.title)
         .accessibilityHint(mode.accessibilityHint)

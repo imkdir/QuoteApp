@@ -68,7 +68,7 @@ struct ReviewStatusButton: View {
         case .reviewedPerfect:
             return .green
         case .reviewedNone:
-            return Color(uiColor: .systemGray4)
+            return Color(uiColor: .systemGray5)
         default:
             return .blue
         }

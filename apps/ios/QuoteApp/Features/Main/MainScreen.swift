@@ -69,7 +69,8 @@ struct MainScreen: View {
             ToolbarItemGroup(placement: .bottomBar) {
                 ActionStackView(
                     toolbarState: viewModel.actionToolbarState,
-                    isPlaybackButtonDisabled: viewModel.isTutorPlaybackRequestInFlight,
+                    isPlaybackButtonDisabled: viewModel.isPlaybackButtonDisabled,
+                    isRecordButtonDisabled: viewModel.isRecordingButtonDisabled,
                     recordingWaveformLevels: viewModel.recordingWaveformLevels,
                     onPlaybackTapped: viewModel.playbackTapped,
                     onRecordTapped: viewModel.recordTapped,

@@ -25,6 +25,7 @@ final class MainViewModel: ObservableObject {
     @Published var liveKitConnectionState: LiveKitConnectionState
     @Published var recordingWaveformLevels: [CGFloat]
     @Published var isTutorAudioDownloadInFlight: Bool
+    @Published private(set) var isPlaybackTransportSetupInProgress: Bool
 
     private let quoteRepository: (any QuoteRepository)?
     private let practiceRepository: (any PracticeRepository)?
@@ -45,7 +46,10 @@ final class MainViewModel: ObservableObject {
     private var pendingTutorPlaybackRequestedAt: Date?
     private var pendingTutorPlaybackSessionID: String?
     private var pendingTutorPlaybackRestoreState: PlaybackState?
+    private var playbackTransportSetupDepth = 0
+    private var playbackTransportCooldownTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
+    private static let playbackTransportSetupCooldownNanoseconds: UInt64 = 650_000_000
 
     init(
         quotes: [Quote] = MockQuotes.all,
@@ -83,6 +87,7 @@ final class MainViewModel: ObservableObject {
         self.liveKitConnectionState = liveKitSessionManager?.connectionState ?? .disconnected
         self.recordingWaveformLevels = userRecordingManager?.meterLevels ?? Self.defaultWaveformLevels
         self.isTutorAudioDownloadInFlight = false
+        self.isPlaybackTransportSetupInProgress = false
 
         let initialWordCount = sessionState.selectedQuoteWordCount
         let initialQuoteText = sessionState.selectedQuote?.text
@@ -218,6 +223,14 @@ final class MainViewModel: ObservableObject {
 
     var isTutorPlaybackRequestInFlight: Bool {
         tutorPlaybackState.isRequesting
+    }
+
+    var isPlaybackButtonDisabled: Bool {
+        isTutorPlaybackRequestInFlight || isPlaybackTransportSetupInProgress || !hasQuoteSelected
+    }
+    
+    var isRecordingButtonDisabled: Bool {
+        !hasQuoteSelected
     }
 
     private static let defaultWaveformLevels = Array(repeating: CGFloat(0.12), count: 16)
@@ -361,6 +374,10 @@ final class MainViewModel: ObservableObject {
             isLoadingQuotes = false
         }
     }
+    
+    var hasQuoteSelected: Bool {
+        sessionState.selectedQuote != nil
+    }
 
     func playbackTapped() {
         guard let selectedQuote = sessionState.selectedQuote else {
@@ -371,7 +388,7 @@ final class MainViewModel: ObservableObject {
             return
         }
 
-        guard !tutorPlaybackState.isRequesting else {
+        guard !isPlaybackButtonDisabled else {
             return
         }
 
@@ -389,6 +406,10 @@ final class MainViewModel: ObservableObject {
             }
 
             guard !self.tutorPlaybackState.isRequesting else {
+                return
+            }
+
+            guard !self.isPlaybackTransportSetupInProgress else {
                 return
             }
 
@@ -1033,6 +1054,11 @@ final class MainViewModel: ObservableObject {
             return
         }
 
+        beginPlaybackTransportSetupGuard()
+        defer {
+            endPlaybackTransportSetupGuard()
+        }
+
         do {
             try audioSessionManager?.configureForVoiceInteraction()
         } catch {
@@ -1245,6 +1271,34 @@ final class MainViewModel: ObservableObject {
         }
 
         await liveKitSessionManager.setTutorAudioPlaybackEnabled(enabled)
+    }
+
+    private func beginPlaybackTransportSetupGuard() {
+        playbackTransportCooldownTask?.cancel()
+        playbackTransportCooldownTask = nil
+        playbackTransportSetupDepth += 1
+        isPlaybackTransportSetupInProgress = true
+    }
+
+    private func endPlaybackTransportSetupGuard() {
+        playbackTransportSetupDepth = max(0, playbackTransportSetupDepth - 1)
+        guard playbackTransportSetupDepth == 0 else {
+            return
+        }
+
+        let cooldownNanoseconds = Self.playbackTransportSetupCooldownNanoseconds
+        playbackTransportCooldownTask?.cancel()
+        playbackTransportCooldownTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: cooldownNanoseconds)
+            guard !Task.isCancelled, let self else {
+                return
+            }
+            guard self.playbackTransportSetupDepth == 0 else {
+                return
+            }
+            self.isPlaybackTransportSetupInProgress = false
+            self.playbackTransportCooldownTask = nil
+        }
     }
 
     private func applyBackendResult(
