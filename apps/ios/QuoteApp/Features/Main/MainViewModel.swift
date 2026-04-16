@@ -26,6 +26,7 @@ final class MainViewModel: ObservableObject {
     @Published var recordingWaveformLevels: [CGFloat]
     @Published var isTutorAudioDownloadInFlight: Bool
     @Published private(set) var isPlaybackTransportSetupInProgress: Bool
+    @Published private(set) var isQuoteContextSwitchInFlight: Bool
 
     private let quoteRepository: (any QuoteRepository)?
     private let practiceRepository: (any PracticeRepository)?
@@ -46,6 +47,7 @@ final class MainViewModel: ObservableObject {
     private var pendingTutorPlaybackRequestedAt: Date?
     private var pendingTutorPlaybackSessionID: String?
     private var pendingTutorPlaybackRestoreState: PlaybackState?
+    private var quoteContextSwitchAttemptID: UUID?
     private var playbackTransportSetupDepth = 0
     private var playbackTransportCooldownTask: Task<Void, Never>?
     private var playbackTransportFailsafeTask: Task<Void, Never>?
@@ -90,6 +92,7 @@ final class MainViewModel: ObservableObject {
         self.recordingWaveformLevels = userRecordingManager?.meterLevels ?? Self.defaultWaveformLevels
         self.isTutorAudioDownloadInFlight = false
         self.isPlaybackTransportSetupInProgress = false
+        self.isQuoteContextSwitchInFlight = false
 
         let initialWordCount = sessionState.selectedQuoteWordCount
         let initialQuoteText = sessionState.selectedQuote?.text
@@ -228,7 +231,10 @@ final class MainViewModel: ObservableObject {
     }
 
     var isPlaybackButtonDisabled: Bool {
-        isTutorPlaybackRequestInFlight || isPlaybackTransportSetupInProgress || !hasQuoteSelected
+        isTutorPlaybackRequestInFlight
+            || isPlaybackTransportSetupInProgress
+            || isQuoteContextSwitchInFlight
+            || !hasQuoteSelected
     }
     
     var isRecordingButtonDisabled: Bool {
@@ -252,6 +258,8 @@ final class MainViewModel: ObservableObject {
         let shouldStopPreviousTutorPlayback =
             (tutorPlaybackState.isPlaying && tutorPlaybackManager.isUsingBackendStream)
             || tutorPlaybackState.isRequesting
+        let shouldGuardQuoteContextSwitch =
+            quote != nil && practiceRepository != nil && previousSessionID != nil
 
         sessionStartTask?.cancel()
         sessionStartTask = nil
@@ -293,15 +301,25 @@ final class MainViewModel: ObservableObject {
         }
 
         guard practiceRepository != nil else {
+            quoteContextSwitchAttemptID = nil
+            isQuoteContextSwitchInFlight = false
             return
         }
 
         if let quote {
+            let quoteContextSwitchAttemptID = shouldGuardQuoteContextSwitch
+                ? beginQuoteContextSwitchGuard()
+                : nil
             Task { [weak self] in
                 guard let self else {
                     return
                 }
-                
+                defer {
+                    if let quoteContextSwitchAttemptID {
+                        self.endQuoteContextSwitchGuard(quoteContextSwitchAttemptID)
+                    }
+                }
+
                 do {
                     let sessionID: String
                     if let activeSessionID = previousSessionID {
@@ -324,6 +342,9 @@ final class MainViewModel: ObservableObject {
                     self.practiceStatusMessage = "Could not start practice session. Review may be unavailable."
                 }
             }
+        } else {
+            quoteContextSwitchAttemptID = nil
+            isQuoteContextSwitchInFlight = false
         }
     }
 
@@ -1309,6 +1330,21 @@ final class MainViewModel: ObservableObject {
             self.practiceStatusMessage = timeoutMessage
             self.playbackTransportFailsafeTask = nil
         }
+    }
+
+    private func beginQuoteContextSwitchGuard() -> UUID {
+        let attemptID = UUID()
+        quoteContextSwitchAttemptID = attemptID
+        isQuoteContextSwitchInFlight = true
+        return attemptID
+    }
+
+    private func endQuoteContextSwitchGuard(_ attemptID: UUID) {
+        guard quoteContextSwitchAttemptID == attemptID else {
+            return
+        }
+        quoteContextSwitchAttemptID = nil
+        isQuoteContextSwitchInFlight = false
     }
 
     private func endPlaybackTransportSetupGuard() {
