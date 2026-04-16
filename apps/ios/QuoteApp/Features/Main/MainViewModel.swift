@@ -48,8 +48,10 @@ final class MainViewModel: ObservableObject {
     private var pendingTutorPlaybackRestoreState: PlaybackState?
     private var playbackTransportSetupDepth = 0
     private var playbackTransportCooldownTask: Task<Void, Never>?
+    private var playbackTransportFailsafeTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     private static let playbackTransportSetupCooldownNanoseconds: UInt64 = 650_000_000
+    private static let playbackTransportSetupMaxDurationNanoseconds: UInt64 = 12_000_000_000
 
     init(
         quotes: [Quote] = MockQuotes.all,
@@ -1278,6 +1280,35 @@ final class MainViewModel: ObservableObject {
         playbackTransportCooldownTask = nil
         playbackTransportSetupDepth += 1
         isPlaybackTransportSetupInProgress = true
+
+        guard playbackTransportSetupDepth == 1 else {
+            return
+        }
+
+        let timeoutNanoseconds = Self.playbackTransportSetupMaxDurationNanoseconds
+        playbackTransportFailsafeTask?.cancel()
+        playbackTransportFailsafeTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+            guard !Task.isCancelled, let self else {
+                return
+            }
+
+            guard self.playbackTransportSetupDepth > 0 else {
+                return
+            }
+
+            self.playbackTransportSetupDepth = 0
+            self.isPlaybackTransportSetupInProgress = false
+            self.playbackTransportCooldownTask?.cancel()
+            self.playbackTransportCooldownTask = nil
+
+            let timeoutMessage = "Live audio setup timed out. Tap Play to retry."
+            let nextState = LiveKitConnectionState.failed(message: timeoutMessage)
+            self.liveKitConnectionState = nextState
+            self.tutorPlaybackManager.applyLiveKitConnectionState(nextState)
+            self.practiceStatusMessage = timeoutMessage
+            self.playbackTransportFailsafeTask = nil
+        }
     }
 
     private func endPlaybackTransportSetupGuard() {
@@ -1285,6 +1316,9 @@ final class MainViewModel: ObservableObject {
         guard playbackTransportSetupDepth == 0 else {
             return
         }
+
+        playbackTransportFailsafeTask?.cancel()
+        playbackTransportFailsafeTask = nil
 
         let cooldownNanoseconds = Self.playbackTransportSetupCooldownNanoseconds
         playbackTransportCooldownTask?.cancel()
