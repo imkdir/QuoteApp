@@ -14,13 +14,20 @@ struct AppEnvironment {
     @MainActor
     static var runtime: AppEnvironment {
         let fallbackURLString = "http://127.0.0.1:8000"
-        let configuredURL =
+        
+        let configuredURLString: String
+        #if targetEnvironment(simulator)
+        configuredURLString = fallbackURLString
+        #else
+        configuredURLString =
             ProcessInfo.processInfo.environment["QUOTEAPP_BACKEND_BASE_URL"] ??
             (Bundle.main.object(forInfoDictionaryKey: "QUOTEAPP_BACKEND_BASE_URL") as? String) ??
             fallbackURLString
+        #endif
 
+        
         let fallbackURL = URL(string: fallbackURLString)!
-        let backendBaseURL = URL(string: configuredURL) ?? fallbackURL
+        let backendBaseURL = URL(string: configuredURLString) ?? fallbackURL
         let tokenProvider = LiveKitTokenProvider(baseURL: backendBaseURL)
 
         return AppEnvironment(
