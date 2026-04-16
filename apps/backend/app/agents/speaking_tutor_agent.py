@@ -47,6 +47,8 @@ _CLIENT_AUDIO_READY_TIMEOUT_SECONDS = 0.6
 _PLAYBACK_GENERATION_VERSION = "quote_tutor_playback_v1"
 _RHYTHM_PROFILE_VERSION = "quote_rhythm_v1"
 _MAX_AUDIO_ARTIFACT_CACHE_ENTRIES = 48
+_AUDIO_ARTIFACT_SYNTHESIS_MAX_ATTEMPTS = 2
+_AUDIO_ARTIFACT_SYNTHESIS_RETRY_BACKOFF_SECONDS = 0.2
 
 
 @dataclass(frozen=True)
@@ -260,63 +262,83 @@ class SpeakingTutorAgentRuntime:
         if not quote_script:
             raise RuntimeError("Selected quote text is empty; tutor playback requires quote text.")
 
-        profile = self._ensure_tts_profile(session_id=session_id, settings=settings)
-        playback_identity = _build_playback_identity(
-            quote_id=context.quote_id,
-            quote_text=context.quote_text,
-            tts_profile=profile,
-        )
-        cached_artifact = self._cached_audio_artifact(playback_identity=playback_identity)
-        if cached_artifact is not None:
-            return TutorPlaybackAudioArtifact(
+        last_error: Optional[Exception] = None
+        for attempt in range(_AUDIO_ARTIFACT_SYNTHESIS_MAX_ATTEMPTS):
+            profile = self._ensure_tts_profile(session_id=session_id, settings=settings)
+            playback_identity = _build_playback_identity(
+                quote_id=context.quote_id,
+                quote_text=context.quote_text,
+                tts_profile=profile,
+            )
+            cached_artifact = self._cached_audio_artifact(playback_identity=playback_identity)
+            if cached_artifact is not None:
+                return TutorPlaybackAudioArtifact(
+                    session_id=session_id,
+                    playback_identity=playback_identity,
+                    word_count=cached_artifact.word_count,
+                    estimated_duration_sec=cached_artifact.estimated_duration_sec,
+                    rhythm_word_end_times=cached_artifact.rhythm_word_end_times,
+                    wav_bytes=cached_artifact.wav_bytes,
+                    cache_hit=True,
+                )
+
+            try:
+                pcm_bytes, sample_rate, num_channels = _synthesize_quote_audio(
+                    quote_script,
+                    tts_profile=profile,
+                    emit_style_log=False,
+                )
+                wav_bytes = _pcm_to_wav_bytes(
+                    pcm_bytes,
+                    sample_rate=sample_rate,
+                    num_channels=num_channels,
+                )
+            except Exception as exc:  # noqa: BLE001 - normalize backend audio synthesis failures
+                last_error = exc
+                should_retry = (
+                    attempt + 1 < _AUDIO_ARTIFACT_SYNTHESIS_MAX_ATTEMPTS
+                    and _is_retryable_tutor_audio_error(exc)
+                )
+                if not should_retry:
+                    break
+                logger.warning(
+                    "Tutor audio synthesis failed for session %s (attempt %d/%d): %s; retrying",
+                    session_id,
+                    attempt + 1,
+                    _AUDIO_ARTIFACT_SYNTHESIS_MAX_ATTEMPTS,
+                    exc,
+                )
+                self.invalidate_tts_profile(session_id=session_id)
+                sleep(_AUDIO_ARTIFACT_SYNTHESIS_RETRY_BACKOFF_SECONDS)
+                continue
+
+            word_count = max(1, len(quote_script.split()))
+            samples_per_channel = len(pcm_bytes) // (2 * max(1, num_channels))
+            estimated_duration_sec = (
+                float(samples_per_channel) / float(sample_rate)
+                if sample_rate > 0
+                else max(0.2, word_count * 0.28)
+            )
+
+            artifact = TutorPlaybackAudioArtifact(
                 session_id=session_id,
                 playback_identity=playback_identity,
-                word_count=cached_artifact.word_count,
-                estimated_duration_sec=cached_artifact.estimated_duration_sec,
-                rhythm_word_end_times=cached_artifact.rhythm_word_end_times,
-                wav_bytes=cached_artifact.wav_bytes,
-                cache_hit=True,
-            )
-
-        try:
-            pcm_bytes, sample_rate, num_channels = _synthesize_quote_audio(
-                quote_script,
-                tts_profile=profile,
-                emit_style_log=False,
-            )
-            wav_bytes = _pcm_to_wav_bytes(
-                pcm_bytes,
-                sample_rate=sample_rate,
-                num_channels=num_channels,
-            )
-        except Exception as exc:  # noqa: BLE001 - normalize backend audio synthesis failures
-            raise RuntimeError(f"backend tutor audio synthesis failed: {exc}") from exc
-
-        word_count = max(1, len(quote_script.split()))
-        samples_per_channel = len(pcm_bytes) // (2 * max(1, num_channels))
-        estimated_duration_sec = (
-            float(samples_per_channel) / float(sample_rate)
-            if sample_rate > 0
-            else max(0.2, word_count * 0.28)
-        )
-
-        artifact = TutorPlaybackAudioArtifact(
-            session_id=session_id,
-            playback_identity=playback_identity,
-            word_count=word_count,
-            estimated_duration_sec=max(0.0, estimated_duration_sec),
-            rhythm_word_end_times=_build_word_rhythm_profile(
-                quote_script=quote_script,
+                word_count=word_count,
                 estimated_duration_sec=max(0.0, estimated_duration_sec),
-            ),
-            wav_bytes=wav_bytes,
-            cache_hit=False,
-        )
-        self._store_audio_artifact(
-            playback_identity=playback_identity,
-            artifact=artifact,
-        )
-        return artifact
+                rhythm_word_end_times=_build_word_rhythm_profile(
+                    quote_script=quote_script,
+                    estimated_duration_sec=max(0.0, estimated_duration_sec),
+                ),
+                wav_bytes=wav_bytes,
+                cache_hit=False,
+            )
+            self._store_audio_artifact(
+                playback_identity=playback_identity,
+                artifact=artifact,
+            )
+            return artifact
+
+        raise RuntimeError(f"backend tutor audio synthesis failed: {last_error}")
 
     def _cached_audio_artifact(self, *, playback_identity: str) -> Optional[TutorPlaybackAudioArtifact]:
         with self._lock:
@@ -362,6 +384,12 @@ class SpeakingTutorAgentRuntime:
             if context is not None:
                 context.tts_voice_name = resolved_profile.voice
         return resolved_profile
+
+    def invalidate_tts_profile(self, *, session_id: str) -> None:
+        """Drops cached TTS profile so next synthesis re-resolves provider/model/voice."""
+
+        with self._lock:
+            self._tts_profiles.pop(session_id, None)
 
     def stop_quote_playback(self, *, session_id: str) -> None:
         """Signals active tutor playback to stop for this session."""
@@ -1224,6 +1252,29 @@ def _truncate_error_body(raw: str, limit: int = 220) -> str:
     if len(clean) <= limit:
         return clean
     return f"{clean[:limit]}..."
+
+
+def _is_retryable_tutor_audio_error(error: Exception) -> bool:
+    message = str(error).lower()
+    retryable_markers = (
+        "network error",
+        "timed out",
+        "timeout",
+        "temporarily",
+        "connection reset",
+        "connection refused",
+        "service unavailable",
+        "too many requests",
+        "request failed (408)",
+        "request failed (409)",
+        "request failed (425)",
+        "request failed (429)",
+        "request failed (500)",
+        "request failed (502)",
+        "request failed (503)",
+        "request failed (504)",
+    )
+    return any(marker in message for marker in retryable_markers)
 
 
 def _trim_silence_edges(

@@ -35,6 +35,7 @@ struct LocalRecordingDraft: Equatable {
 struct PracticeSession: Equatable {
     let quote: Quote?
     var backendSessionID: String?
+    var backendQuoteID: String?
     var liveKitRoomName: String?
     var tutorPlaybackIdentity: String?
     var attempts: [PracticeAttempt]
@@ -43,6 +44,7 @@ struct PracticeSession: Equatable {
     init(
         quote: Quote?,
         backendSessionID: String? = nil,
+        backendQuoteID: String? = nil,
         liveKitRoomName: String? = nil,
         tutorPlaybackIdentity: String? = nil,
         attempts: [PracticeAttempt] = [],
@@ -50,6 +52,7 @@ struct PracticeSession: Equatable {
     ) {
         self.quote = quote
         self.backendSessionID = backendSessionID
+        self.backendQuoteID = backendQuoteID
         self.liveKitRoomName = liveKitRoomName
         self.tutorPlaybackIdentity = tutorPlaybackIdentity
         self.attempts = attempts

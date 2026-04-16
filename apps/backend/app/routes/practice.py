@@ -24,6 +24,7 @@ from app.services.practice_service import (
     update_tutor_status,
     submit_practice_attempt,
 )
+from app.services.quote_service import list_quotes
 from app.services.result_service import LatestAttemptResultResponse, build_latest_result_response
 
 router = APIRouter(prefix="/practice", tags=["practice"])
@@ -46,6 +47,44 @@ def _sync_tutor_status(session_id: str) -> None:
         return
 
 
+def _resolve_quote_text_for_session(session) -> str:
+    quote_text = (session.quote_text or "").strip()
+    if quote_text:
+        return quote_text
+
+    for quote in list_quotes():
+        if quote.id == session.quote_id and quote.text.strip():
+            return quote.text
+    return ""
+
+
+def _resync_tutor_runtime_session(session_id: str, settings) -> Optional[str]:
+    try:
+        session = get_practice_session(session_id)
+    except SessionNotFoundError:
+        return None
+
+    resolved_quote_text = _resolve_quote_text_for_session(session)
+    try:
+        _TUTOR_RUNTIME.ensure_session_tutor(
+            session_id=session.session_id,
+            quote_id=session.quote_id,
+            room_name=session.livekit_room,
+            quote_text=resolved_quote_text,
+            settings=settings,
+        )
+        _TUTOR_RUNTIME.update_session_quote_context(
+            session_id=session.session_id,
+            quote_id=session.quote_id,
+            quote_text=resolved_quote_text,
+        )
+        _sync_tutor_status(session_id)
+    except RuntimeError as exc:
+        return str(exc)
+
+    return None
+
+
 @router.post("/session/start", response_model=StartPracticeSessionResponse)
 def start_practice_session(
     payload: StartPracticeSessionRequest,
@@ -57,11 +96,12 @@ def start_practice_session(
         quote_id=payload.quote_id,
         quote_text=payload.quote_text,
     )
+    resolved_quote_text = _resolve_quote_text_for_session(session)
     tutor_context = _TUTOR_RUNTIME.ensure_session_tutor(
         session_id=session.session_id,
         quote_id=session.quote_id,
         room_name=session.livekit_room,
-        quote_text=session.quote_text or "",
+        quote_text=resolved_quote_text,
         settings=settings,
     )
     tutor_playback_identity: Optional[str] = None
@@ -154,10 +194,11 @@ def update_session_quote(
             quote_id=payload.quote_id,
             quote_text=payload.quote_text,
         )
+        resolved_quote_text = _resolve_quote_text_for_session(session)
         _TUTOR_RUNTIME.update_session_quote_context(
             session_id=session.session_id,
             quote_id=session.quote_id,
-            quote_text=session.quote_text or "",
+            quote_text=resolved_quote_text,
         )
         _sync_tutor_status(session_id)
     except SessionNotFoundError as exc:
@@ -318,6 +359,15 @@ def get_tutor_quote_audio_artifact(session_id: str) -> Response:
     settings = get_settings()
     context = _TUTOR_RUNTIME.context_for_session(session_id)
     if context is None:
+        recovery_error = _resync_tutor_runtime_session(session_id, settings)
+        if recovery_error:
+            logger.warning(
+                "Tutor runtime session recovery failed before audio fetch for %s: %s",
+                session_id,
+                recovery_error,
+            )
+        context = _TUTOR_RUNTIME.context_for_session(session_id)
+    if context is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
@@ -326,19 +376,41 @@ def get_tutor_quote_audio_artifact(session_id: str) -> Response:
             },
         )
 
+    artifact = None
+    first_runtime_error: Optional[RuntimeError] = None
     try:
         artifact = _TUTOR_RUNTIME.build_tutor_audio_artifact(
             session_id=session_id,
             settings=settings,
         )
     except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "code": "tutor_audio_unavailable",
-                "message": str(exc),
-            },
-        ) from exc
+        first_runtime_error = exc
+        logger.warning(
+            "Tutor audio artifact build failed for %s (first attempt): %s",
+            session_id,
+            exc,
+        )
+        recovery_error = _resync_tutor_runtime_session(session_id, settings)
+        if recovery_error:
+            logger.warning(
+                "Tutor runtime session recovery failed after audio build error for %s: %s",
+                session_id,
+                recovery_error,
+            )
+        try:
+            artifact = _TUTOR_RUNTIME.build_tutor_audio_artifact(
+                session_id=session_id,
+                settings=settings,
+            )
+        except RuntimeError as retry_exc:
+            message = f"{first_runtime_error}; recovery retry failed: {retry_exc}"
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "tutor_audio_unavailable",
+                    "message": message,
+                },
+            ) from retry_exc
     except Exception as exc:  # noqa: BLE001 - runtime boundary
         logger.exception("Unexpected tutor audio artifact failure for session %s", session_id)
         raise HTTPException(
@@ -348,6 +420,20 @@ def get_tutor_quote_audio_artifact(session_id: str) -> Response:
                 "message": f"backend tutor audio unavailable: {exc}",
             },
         ) from exc
+
+    if artifact is None:
+        message = (
+            "backend tutor audio unavailable: artifact generation returned no result"
+            if first_runtime_error is None
+            else str(first_runtime_error)
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "tutor_audio_unavailable",
+                "message": message,
+            },
+        )
 
     headers = {
         "X-QuoteApp-Playback-Identity": artifact.playback_identity,

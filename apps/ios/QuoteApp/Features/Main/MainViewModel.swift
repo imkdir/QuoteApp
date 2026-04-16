@@ -6,11 +6,14 @@ import Foundation
 final class MainViewModel: ObservableObject {
     private enum PracticeFlowError: LocalizedError {
         case repositoryUnavailable
+        case quoteContextMismatch(expectedQuoteID: String, actualQuoteID: String)
 
         var errorDescription: String? {
             switch self {
             case .repositoryUnavailable:
                 return "Practice repository is not configured."
+            case let .quoteContextMismatch(expectedQuoteID, actualQuoteID):
+                return "Practice session quote mismatch. Expected \(expectedQuoteID), got \(actualQuoteID)."
             }
         }
     }
@@ -40,6 +43,8 @@ final class MainViewModel: ObservableObject {
     private var sessionStartTask: Task<PracticeSessionStart, Error>?
     private var resultPollingTask: Task<Void, Never>?
     private var tutorPlaybackTask: Task<Void, Never>?
+    private var quoteContextSwitchTask: Task<Void, Never>?
+    private var quoteContextSwitchTaskID: UUID?
     private var activeLoadingAttemptID: UUID?
     private let participantIdentity: String
     private var lastObservedPlaybackState: PlaybackState
@@ -254,6 +259,7 @@ final class MainViewModel: ObservableObject {
 
     func selectQuote(_ quote: Quote?) {
         let previousSessionID = sessionState.practiceSession?.backendSessionID
+        let previousBackendQuoteID = sessionState.practiceSession?.backendQuoteID
         let previousLiveKitRoomName = sessionState.practiceSession?.liveKitRoomName
         let shouldStopPreviousTutorPlayback =
             (tutorPlaybackState.isPlaying && tutorPlaybackManager.isUsingBackendStream)
@@ -267,6 +273,9 @@ final class MainViewModel: ObservableObject {
         resultPollingTask = nil
         tutorPlaybackTask?.cancel()
         tutorPlaybackTask = nil
+        quoteContextSwitchTask?.cancel()
+        quoteContextSwitchTask = nil
+        quoteContextSwitchTaskID = nil
         activeLoadingAttemptID = nil
         isTutorAudioDownloadInFlight = false
         isTutorPlaybackCommandInFlight = false
@@ -276,6 +285,7 @@ final class MainViewModel: ObservableObject {
             PracticeSession(
                 quote: quote,
                 backendSessionID: previousSessionID,
+                backendQuoteID: previousBackendQuoteID,
                 liveKitRoomName: previousLiveKitRoomName
             )
         )
@@ -310,14 +320,26 @@ final class MainViewModel: ObservableObject {
             let quoteContextSwitchAttemptID = shouldGuardQuoteContextSwitch
                 ? beginQuoteContextSwitchGuard()
                 : nil
-            Task { [weak self] in
+            let quoteContextSwitchTaskID = UUID()
+            self.quoteContextSwitchTaskID = quoteContextSwitchTaskID
+            let quoteContextSwitchTask = Task { [weak self] in
                 guard let self else {
                     return
                 }
                 defer {
+                    if self.quoteContextSwitchTaskID == quoteContextSwitchTaskID {
+                        self.quoteContextSwitchTask = nil
+                        self.quoteContextSwitchTaskID = nil
+                    }
                     if let quoteContextSwitchAttemptID {
                         self.endQuoteContextSwitchGuard(quoteContextSwitchAttemptID)
                     }
+                }
+                guard !Task.isCancelled else {
+                    return
+                }
+                guard self.sessionState.selectedQuote?.id == quote.id else {
+                    return
                 }
 
                 do {
@@ -338,10 +360,17 @@ final class MainViewModel: ObservableObject {
                     guard self.sessionState.selectedQuote?.id == quote.id else {
                         return
                     }
+                    self.updatePracticeSession { session in
+                        session.backendSessionID = nil
+                        session.backendQuoteID = nil
+                        session.liveKitRoomName = nil
+                        session.tutorPlaybackIdentity = nil
+                    }
                     self.refreshLiveAPIStatusAfterRequestError(error)
                     self.practiceStatusMessage = "Could not start practice session. Review may be unavailable."
                 }
             }
+            self.quoteContextSwitchTask = quoteContextSwitchTask
         } else {
             quoteContextSwitchAttemptID = nil
             isQuoteContextSwitchInFlight = false
@@ -480,7 +509,15 @@ final class MainViewModel: ObservableObject {
                 }
 
                 do {
-                    let sessionID = try await self.ensurePracticeSessionID(for: selectedQuote)
+                    var sessionID = try await self.ensurePracticeSessionID(for: selectedQuote)
+                    guard self.isSelectedQuoteCurrent(selectedQuote) else {
+                        self.cancelTutorPlaybackRequestIfNeeded(restorePreviousState: true)
+                        return
+                    }
+                    sessionID = try await self.ensureBackendSessionQuoteContext(
+                        for: selectedQuote,
+                        sessionID: sessionID
+                    )
                     guard self.isSelectedQuoteCurrent(selectedQuote) else {
                         self.cancelTutorPlaybackRequestIfNeeded(restorePreviousState: true)
                         return
@@ -532,6 +569,8 @@ final class MainViewModel: ObservableObject {
                         let recoveredSessionID = try await self.restartBackendSessionAndReconnect(
                             for: selectedQuote
                         )
+                        sessionID = recoveredSessionID
+                        self.pendingTutorPlaybackSessionID = recoveredSessionID
                         artifact = try await practiceRepository.fetchTutorPlaybackAudioArtifact(
                             sessionID: recoveredSessionID
                         )
@@ -916,12 +955,20 @@ final class MainViewModel: ObservableObject {
             let startedSession = try await startTask.value
             sessionStartTask = nil
 
+            guard startedSession.quoteID == quote.id else {
+                throw PracticeFlowError.quoteContextMismatch(
+                    expectedQuoteID: quote.id,
+                    actualQuoteID: startedSession.quoteID
+                )
+            }
+
             guard sessionState.selectedQuote?.id == quote.id else {
                 return startedSession.sessionID
             }
 
             updatePracticeSession { session in
                 session.backendSessionID = startedSession.sessionID
+                session.backendQuoteID = startedSession.quoteID
                 if let liveKitRoom = startedSession.liveKitRoom, !liveKitRoom.isEmpty {
                     session.liveKitRoomName = liveKitRoom
                 }
@@ -939,6 +986,38 @@ final class MainViewModel: ObservableObject {
         } catch {
             sessionStartTask = nil
             throw error
+        }
+    }
+
+    private func ensureBackendSessionQuoteContext(
+        for quote: Quote,
+        sessionID: String
+    ) async throws -> String {
+        if let practiceSession = sessionState.practiceSession,
+           practiceSession.backendSessionID == sessionID,
+           practiceSession.backendQuoteID == quote.id {
+            return sessionID
+        }
+        do {
+            let updatedSession = try await switchQuoteInExistingSession(
+                sessionID: sessionID,
+                quote: quote
+            )
+            return updatedSession.sessionID
+        } catch let PracticeFlowError.quoteContextMismatch(expectedQuoteID, actualQuoteID) {
+            NSLog(
+                "[Practice] Backend quote context mismatch for session %@ (expected %@, got %@). Restarting session.",
+                sessionID,
+                expectedQuoteID,
+                actualQuoteID
+            )
+            updatePracticeSession { session in
+                session.backendSessionID = nil
+                session.backendQuoteID = nil
+                session.liveKitRoomName = nil
+                session.tutorPlaybackIdentity = nil
+            }
+            return try await ensurePracticeSessionID(for: quote)
         }
     }
 
@@ -1015,7 +1094,11 @@ final class MainViewModel: ObservableObject {
         }
 
         do {
-            let sessionID = try await ensurePracticeSessionID(for: quote)
+            var sessionID = try await ensurePracticeSessionID(for: quote)
+            sessionID = try await ensureBackendSessionQuoteContext(
+                for: quote,
+                sessionID: sessionID
+            )
             await connectLiveKitIfNeeded(for: quote, sessionID: sessionID)
             guard isSelectedQuoteCurrent(quote) else {
                 return false
@@ -1522,6 +1605,7 @@ final class MainViewModel: ObservableObject {
     private func restartBackendSessionAndReconnect(for quote: Quote) async throws -> String {
         updatePracticeSession { session in
             session.backendSessionID = nil
+            session.backendQuoteID = nil
             session.liveKitRoomName = nil
             session.tutorPlaybackIdentity = nil
         }
@@ -1547,16 +1631,25 @@ final class MainViewModel: ObservableObject {
                 quoteID: quote.id,
                 quoteText: quote.text
             )
+            guard updatedSession.quoteID == quote.id else {
+                throw PracticeFlowError.quoteContextMismatch(
+                    expectedQuoteID: quote.id,
+                    actualQuoteID: updatedSession.quoteID
+                )
+            }
             guard sessionState.selectedQuote?.id == quote.id else {
                 return updatedSession
             }
 
             updatePracticeSession { session in
                 session.backendSessionID = updatedSession.sessionID
+                session.backendQuoteID = updatedSession.quoteID
                 if let liveKitRoom = updatedSession.liveKitRoom, !liveKitRoom.isEmpty {
                     session.liveKitRoomName = liveKitRoom
                 }
-                session.tutorPlaybackIdentity = updatedSession.tutorPlaybackIdentity
+                // Do not trust precomputed playback identity on quote switch.
+                // Use the identity returned with the actual /tutor/audio artifact instead.
+                session.tutorPlaybackIdentity = nil
             }
             await refreshLiveAPIStatusAfterRequestSuccess(
                 for: quote,
@@ -1569,6 +1662,7 @@ final class MainViewModel: ObservableObject {
             }
             updatePracticeSession { session in
                 session.backendSessionID = nil
+                session.backendQuoteID = nil
                 session.liveKitRoomName = nil
                 session.tutorPlaybackIdentity = nil
             }
